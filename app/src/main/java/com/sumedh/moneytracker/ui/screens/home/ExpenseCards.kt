@@ -59,6 +59,8 @@ fun RecentExpensesSection(
     onExpenseLongPress: (ExpenseEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val groups = remember(expenses) { ExpenseAnalytics.groupByDay(expenses) }
+
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -95,26 +97,54 @@ fun RecentExpensesSection(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         if (expenses.isEmpty()) {
             EmptyExpensesCard()
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                expenses.forEachIndexed { index, expense ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn(tween(280 + index * 24)) +
-                            slideInVertically(tween(280 + index * 24)) { it / 10 }
-                    ) {
-                        ExpenseCard(
-                            expense = expense,
-                            onLongPress = { onExpenseLongPress(expense) }
-                        )
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                groups.forEach { group ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DayHeader(title = group.header)
+                        group.expenses.forEachIndexed { index, expense ->
+                            AnimatedVisibility(
+                                visible = true,
+                                enter = fadeIn(tween(240 + index * 20)) +
+                                    slideInVertically(tween(240 + index * 20)) { it / 12 }
+                            ) {
+                                ExpenseCard(
+                                    expense = expense,
+                                    onLongPress = { onExpenseLongPress(expense) }
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DayHeader(title: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(14.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(NeonTeal)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = TextSecondary
+        )
     }
 }
 
@@ -125,13 +155,13 @@ fun ExpenseCard(
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(16.dp)
     val merchant = expense.note.ifBlank { expense.category }
     val accent = CategoryColors.forCategory(expense.category)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val elevation by animateDpAsState(
-        targetValue = if (pressed) 10.dp else 4.dp,
+        targetValue = if (pressed) 8.dp else 3.dp,
         animationSpec = tween(160),
         label = "expenseElevation"
     )
@@ -142,8 +172,8 @@ fun ExpenseCard(
             .shadow(
                 elevation = elevation,
                 shape = shape,
-                spotColor = accent.copy(alpha = 0.18f),
-                ambientColor = Color.Black.copy(alpha = 0.28f)
+                spotColor = accent.copy(alpha = 0.16f),
+                ambientColor = Color.Black.copy(alpha = 0.24f)
             )
             .clip(shape)
             .background(
@@ -153,7 +183,7 @@ fun ExpenseCard(
             )
             .border(
                 width = 1.dp,
-                color = BorderEmerald,
+                color = Color.White.copy(alpha = 0.06f),
                 shape = shape
             )
             .combinedClickable(
@@ -162,7 +192,7 @@ fun ExpenseCard(
                 onClick = {},
                 onLongClick = onLongPress
             )
-            .padding(horizontal = 14.dp, vertical = 13.dp)
+            .padding(horizontal = 12.dp, vertical = 11.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -170,13 +200,13 @@ fun ExpenseCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(accent.copy(alpha = 0.16f))
                     .border(
                         width = 1.dp,
-                        color = accent.copy(alpha = 0.28f),
-                        shape = RoundedCornerShape(14.dp)
+                        color = accent.copy(alpha = 0.26f),
+                        shape = RoundedCornerShape(12.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -184,25 +214,25 @@ fun ExpenseCard(
                     imageVector = categoryIcon(expense.category),
                     contentDescription = expense.category,
                     tint = accent,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = merchant,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = TextPrimary
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = expense.time,
@@ -215,7 +245,7 @@ fun ExpenseCard(
 
             Text(
                 text = ExpenseAnalytics.formatInr(expense.amount),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
             )
@@ -236,24 +266,19 @@ private fun CategoryBadge(
         color = color,
         maxLines = 1,
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(7.dp))
             .background(color.copy(alpha = 0.14f))
-            .border(1.dp, color.copy(alpha = 0.22f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 3.dp)
+            .border(1.dp, color.copy(alpha = 0.22f), RoundedCornerShape(7.dp))
+            .padding(horizontal = 7.dp, vertical = 2.dp)
     )
 }
 
 @Composable
 private fun EmptyExpensesCard() {
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(18.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(
-                elevation = 6.dp,
-                shape = shape,
-                spotColor = Color.Black.copy(alpha = 0.3f)
-            )
             .clip(shape)
             .background(
                 Brush.linearGradient(
@@ -261,13 +286,13 @@ private fun EmptyExpensesCard() {
                 )
             )
             .border(1.dp, BorderEmerald, shape)
-            .padding(horizontal = 24.dp, vertical = 32.dp),
+            .padding(horizontal = 20.dp, vertical = 26.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .size(46.dp)
+                .clip(RoundedCornerShape(14.dp))
                 .background(NeonTeal.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
@@ -275,17 +300,17 @@ private fun EmptyExpensesCard() {
                 painter = painterResource(R.drawable.ic_qr_scan),
                 contentDescription = null,
                 tint = NeonTeal,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = "No expenses yet",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = TextPrimary
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "Scan & Pay or Quick Add to log your first expense.",
             style = MaterialTheme.typography.bodyMedium,

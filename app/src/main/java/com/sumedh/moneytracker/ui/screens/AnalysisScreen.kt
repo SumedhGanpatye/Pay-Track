@@ -76,7 +76,7 @@ fun AnalysisScreen(
                 .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
             Text(
-                text = "Analysis",
+                text = "Analytics",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground

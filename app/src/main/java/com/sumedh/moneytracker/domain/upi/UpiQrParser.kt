@@ -5,6 +5,11 @@ package com.sumedh.moneytracker.domain.upi
  */
 object UpiQrParser {
 
+    private val TRACKED_KEYS = listOf(
+        "pa", "pn", "am", "tn", "tr", "tid", "mc", "mode", "orgid", "sign",
+        "cu", "url", "mam"
+    )
+
     data class ParsedUpiQr(
         val rawValue: String,
         val payeeAddress: String,
@@ -12,33 +17,79 @@ object UpiQrParser {
         val amount: String?,
         /** When true, amount came from QR and is shown prefilled; still editable unless locked. */
         val amountFromQr: Boolean,
-        val amountLocked: Boolean = false
+        val amountLocked: Boolean = false,
+        /** Full query map for debugging / forward-compat. */
+        val allParams: Map<String, String> = emptyMap()
     )
 
     fun parse(raw: String): ParsedUpiQr? {
         val trimmed = raw.trim()
-        if (trimmed.isEmpty()) return null
+
+        UpiDebugLog.banner("QR PARSE")
+        UpiDebugLog.section("RAW_QR")
+        UpiDebugLog.line(trimmed.ifEmpty { "<empty after trim>" })
+        UpiDebugLog.field("raw_length", trimmed.length.toString())
+        UpiDebugLog.field("raw_unchanged_vs_input", (trimmed == raw).toString())
+        if (trimmed != raw) {
+            UpiDebugLog.field("input_length_before_trim", raw.length.toString())
+        }
+
+        if (trimmed.isEmpty()) {
+            UpiDebugLog.line("parse_succeeded = false (empty)")
+            return null
+        }
 
         val lower = trimmed.lowercase()
         val isUpiScheme = lower.startsWith("upi://") || lower.startsWith("upi:")
         val looksLikeUpiPayload = lower.contains("pa=") && lower.contains("pn=")
-        if (!isUpiScheme && !looksLikeUpiPayload) return null
+        UpiDebugLog.field("is_upi_scheme", isUpiScheme.toString())
+        UpiDebugLog.field("looks_like_upi_payload", looksLikeUpiPayload.toString())
+
+        if (!isUpiScheme && !looksLikeUpiPayload) {
+            UpiDebugLog.line("parse_succeeded = false (not a UPI QR)")
+            return null
+        }
 
         val query = extractQuery(trimmed)
         val params = parseQueryParams(query)
-        val pa = params["pa"]?.takeIf { it.isNotBlank() } ?: return null
+
+        UpiDebugLog.section("PARSED_DATA")
+        TRACKED_KEYS.forEach { key ->
+            if (params.containsKey(key)) {
+                UpiDebugLog.field(key, params[key])
+            } else {
+                UpiDebugLog.field(key, null)
+                UpiDebugLog.line("  (missing key: $key)")
+            }
+        }
+        val extras = params.keys.filter { it !in TRACKED_KEYS }
+        if (extras.isNotEmpty()) {
+            UpiDebugLog.line("  extra_keys = $extras")
+            extras.forEach { UpiDebugLog.field(it, params[it]) }
+        }
+
+        val pa = params["pa"]?.takeIf { it.isNotBlank() }
+        if (pa == null) {
+            UpiDebugLog.line("parse_succeeded = false (pa missing/blank)")
+            return null
+        }
+
         val amount = params["am"]?.takeIf { it.isNotBlank() && it.toDoubleOrNull() != null }
-        // Some QRs use mam (minimum amount) — treat am as preferred fill.
         val locked = params["mode"]?.equals("fixed", ignoreCase = true) == true
 
-        return ParsedUpiQr(
+        val result = ParsedUpiQr(
             rawValue = trimmed,
             payeeAddress = pa,
             payeeName = params["pn"]?.takeIf { it.isNotBlank() },
             amount = amount,
             amountFromQr = amount != null,
-            amountLocked = locked && amount != null
+            amountLocked = locked && amount != null,
+            allParams = params
         )
+        UpiDebugLog.line("parse_succeeded = true")
+        UpiDebugLog.field("amountFromQr", result.amountFromQr.toString())
+        UpiDebugLog.field("amountLocked", result.amountLocked.toString())
+        return result
     }
 
     fun isValidUpiQr(raw: String): Boolean = parse(raw) != null

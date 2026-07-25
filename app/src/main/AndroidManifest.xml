@@ -18,6 +18,7 @@
         <package android:name="net.one97.paytm" />
         <package android:name="in.org.npci.upiapp" />
         <package android:name="in.amazon.mShop.android.shopping" />
+        <package android:name="money.super.payments" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="upi" />

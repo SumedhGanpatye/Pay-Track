@@ -78,7 +78,7 @@ fun QuickAddCard(
     initiallyExpanded: Boolean = false
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(16.dp)
 
     Surface(
         onClick = { if (!expanded) expanded = true },
@@ -100,10 +100,10 @@ fun QuickAddCard(
                 )
                 .border(
                     width = 1.dp,
-                    color = BorderEmerald,
+                    color = Color.White.copy(alpha = 0.08f),
                     shape = shape
                 )
-                .padding(18.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -113,13 +113,13 @@ fun QuickAddCard(
                     imageVector = Icons.Outlined.Edit,
                     contentDescription = null,
                     tint = TextSecondary,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Quick Add",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary
                     )
@@ -131,7 +131,7 @@ fun QuickAddCard(
                 }
                 IconButton(
                     onClick = { expanded = !expanded },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = if (expanded) {
@@ -140,7 +140,8 @@ fun QuickAddCard(
                             AppIcons.ExpandMore
                         },
                         contentDescription = if (expanded) "Collapse" else "Expand",
-                        tint = TextSecondary
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }

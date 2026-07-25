@@ -2,6 +2,7 @@ package com.sumedh.moneytracker.domain.upi
 
 /**
  * Supported UPI apps for Scan & Pay.
+ * Declaration order = chooser display order.
  */
 enum class UpiApp(
     val displayName: String,
@@ -11,21 +12,25 @@ enum class UpiApp(
         displayName = "Google Pay",
         packageName = "com.google.android.apps.nbu.paisa.user"
     ),
-    PHONEPE(
-        displayName = "PhonePe",
-        packageName = "com.phonepe.app"
+    BHIM(
+        displayName = "BHIM",
+        packageName = "in.org.npci.upiapp"
     ),
     PAYTM(
         displayName = "Paytm",
         packageName = "net.one97.paytm"
     ),
-    BHIM(
-        displayName = "BHIM",
-        packageName = "in.org.npci.upiapp"
+    SUPER_MONEY(
+        displayName = "SuperMoney",
+        packageName = "money.super.payments"
     ),
     AMAZON_PAY(
         displayName = "Amazon Pay",
         packageName = "in.amazon.mShop.android.shopping"
+    ),
+    PHONEPE(
+        displayName = "PhonePe",
+        packageName = "com.phonepe.app"
     );
 
     companion object {

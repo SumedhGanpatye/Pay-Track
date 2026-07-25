@@ -36,9 +36,9 @@ import com.sumedh.moneytracker.ui.theme.TextSecondary
 import com.sumedh.moneytracker.util.ExpenseAnalytics
 
 /**
- * Home — premium entry surface for Money Tracker v2.
+ * Home — premium entry surface for Pay&Track.
  *
- * Hierarchy: Header → Scan & Pay hero → Quick Add → Recent Expenses.
+ * Hierarchy: Header → Scan & Pay → Quick Add → Recent Expenses.
  */
 @Composable
 fun HomeScreen(
@@ -64,10 +64,10 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
-                top = 18.dp,
-                bottom = 32.dp
+                start = 16.dp,
+                end = 16.dp,
+                top = 14.dp,
+                bottom = 28.dp
             ),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
@@ -82,7 +82,7 @@ fun HomeScreen(
                         todayCount = todayCount
                     )
                 }
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
             item(key = "scan_pay") {
@@ -92,7 +92,7 @@ fun HomeScreen(
                 ) {
                     ScanPayHeroCard(onClick = onScanAndPay)
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             item(key = "quick_add") {
@@ -107,7 +107,7 @@ fun HomeScreen(
                     onNoteChange = viewModel::onNoteChange,
                     onSave = viewModel::saveExpense
                 )
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(18.dp))
             }
 
             item(key = "recent") {

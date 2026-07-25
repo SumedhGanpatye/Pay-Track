@@ -82,7 +82,9 @@ fun SettingsScreen(
     var showEditName by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var saveAsDefault by remember { mutableStateOf(true) }
-    val upiApps = remember { UpiPaymentLauncher.installedApps(context) }
+    var upiApps by remember {
+        mutableStateOf(UpiPaymentLauncher.installedApps(context))
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -177,7 +179,10 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showUpiSheet = true }
+                        .clickable {
+                            upiApps = UpiPaymentLauncher.installedApps(context)
+                            showUpiSheet = true
+                        }
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween

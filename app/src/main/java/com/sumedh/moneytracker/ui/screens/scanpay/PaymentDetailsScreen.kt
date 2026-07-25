@@ -43,6 +43,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sumedh.moneytracker.MoneyTrackerApp
 import com.sumedh.moneytracker.data.ExpenseRepository
 import com.sumedh.moneytracker.domain.upi.PaymentSession
+import com.sumedh.moneytracker.domain.upi.UpiDebugLog
 import com.sumedh.moneytracker.ui.components.AppScreenBackground
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.AmountSection
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.CategorySelector
@@ -87,8 +88,8 @@ fun PaymentDetailsScreen(
 
     val upiLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) {
-        viewModel.onReturnedFromUpi()
+    ) { result ->
+        viewModel.onReturnedFromUpi(result = result, source = "StartActivityForResult")
     }
 
     LaunchedEffect(Unit) {
@@ -96,8 +97,10 @@ fun PaymentDetailsScreen(
             when (event) {
                 is PaymentDetailsEvent.LaunchUpi -> {
                     try {
+                        UpiDebugLog.line("launching UPI activity via StartActivityForResult…")
                         upiLauncher.launch(event.intent)
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        UpiDebugLog.line("UPI launch EXCEPTION: ${e.javaClass.simpleName}: ${e.message}")
                         Toast.makeText(
                             context,
                             "Could not open ${uiState.selectedUpiApp.displayName}",
@@ -132,7 +135,7 @@ fun PaymentDetailsScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && PaymentSession.awaitingUpiReturn) {
-                viewModel.onReturnedFromUpi()
+                viewModel.onReturnedFromUpi(result = null, source = "Lifecycle.ON_RESUME")
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -197,11 +200,13 @@ fun PaymentDetailsScreen(
                         visible = true,
                         enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 12 }
                     ) {
-                        MerchantCard(
-                            merchantName = uiState.merchantName.ifBlank { "Unknown merchant" },
-                            upiId = uiState.upiId.ifBlank { "UPI ID unavailable" },
-                            verified = uiState.verified && uiState.upiId.isNotBlank()
-                        )
+                        Column {
+                            MerchantCard(
+                                merchantName = uiState.merchantName.ifBlank { "Unknown merchant" },
+                                upiId = uiState.upiId.ifBlank { "UPI ID unavailable" },
+                                verified = uiState.verified && uiState.upiId.isNotBlank()
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))

@@ -1,7 +1,6 @@
 package com.sumedh.moneytracker.ui.screens.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,18 +18,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sumedh.moneytracker.R
 import com.sumedh.moneytracker.ui.components.pressableScale
 import com.sumedh.moneytracker.ui.icons.AppIcons
-import com.sumedh.moneytracker.ui.theme.BorderEmerald
 import com.sumedh.moneytracker.ui.theme.CardBackground
 import com.sumedh.moneytracker.ui.theme.NeonTeal
 import com.sumedh.moneytracker.ui.theme.SoftMint
@@ -43,18 +44,13 @@ fun ScanPayHeroCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(22.dp)
+    val dashColor = NeonTeal.copy(alpha = 0.6f)
     Surface(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .pressableScale()
-            .shadow(
-                elevation = 12.dp,
-                shape = shape,
-                spotColor = NeonTeal.copy(alpha = 0.22f),
-                ambientColor = Color.Black.copy(alpha = 0.35f)
-            ),
+            .pressableScale(),
         shape = shape,
         color = Color.Transparent,
         tonalElevation = 0.dp
@@ -72,12 +68,21 @@ fun ScanPayHeroCard(
                         )
                     )
                 )
-                .border(
-                    width = 1.dp,
-                    color = NeonTeal.copy(alpha = 0.28f),
-                    shape = shape
-                )
-                .padding(horizontal = 20.dp, vertical = 20.dp)
+                .drawBehind {
+                    val stroke = Stroke(
+                        width = 1.8.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(
+                            floatArrayOf(12.dp.toPx(), 8.dp.toPx()),
+                            0f
+                        )
+                    )
+                    drawRoundRect(
+                        color = dashColor,
+                        style = stroke,
+                        cornerRadius = CornerRadius(22.dp.toPx())
+                    )
+                }
+                .padding(horizontal = 18.dp, vertical = 18.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -85,12 +90,7 @@ fun ScanPayHeroCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
-                        .shadow(
-                            elevation = 6.dp,
-                            shape = CircleShape,
-                            spotColor = NeonTeal.copy(alpha = 0.28f)
-                        )
+                        .size(52.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
@@ -99,11 +99,6 @@ fun ScanPayHeroCard(
                                     CardBackground
                                 )
                             )
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = BorderEmerald,
-                            shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -111,11 +106,11 @@ fun ScanPayHeroCard(
                         painter = painterResource(R.drawable.ic_qr_scan),
                         contentDescription = null,
                         tint = SoftMint,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(26.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -129,26 +124,16 @@ fun ScanPayHeroCard(
                         text = "Scan any UPI QR, pay securely and organize your expense.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary,
-                        maxLines = 3
+                        maxLines = 2
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(NeonTeal.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = AppIcons.ChevronRight,
-                        contentDescription = "Open Scan & Pay",
-                        tint = NeonTeal,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                Icon(
+                    imageVector = AppIcons.ChevronRight,
+                    contentDescription = "Open Scan & Pay",
+                    tint = NeonTeal,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
     }

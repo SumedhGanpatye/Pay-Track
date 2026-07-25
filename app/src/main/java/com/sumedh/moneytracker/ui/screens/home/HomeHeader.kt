@@ -50,17 +50,18 @@ fun HomeHeader(
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
             Text(
-                text = greeting,
+                text = "Home",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = TextPrimary,
-                maxLines = 2
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Track. Pay. Save.",
+                text = greeting,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
+                color = TextSecondary,
+                maxLines = 1
             )
         }
         TodaySummaryCard(

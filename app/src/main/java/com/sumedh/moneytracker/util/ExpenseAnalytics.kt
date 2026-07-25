@@ -136,4 +136,45 @@ object ExpenseAnalytics {
     }
 
     fun formatInr(amount: Double): String = "₹${formatIndianNumber(amount)}"
+
+    private val dayHeaderFmt: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+
+    data class ExpenseDayGroup(
+        val header: String,
+        val isoDate: String,
+        val expenses: List<ExpenseEntity>
+    )
+
+    /** Group expenses (already date-desc) into Today / Yesterday / dated sections. */
+    fun groupByDay(
+        expenses: List<ExpenseEntity>,
+        today: LocalDate = DateRanges.today()
+    ): List<ExpenseDayGroup> {
+        if (expenses.isEmpty()) return emptyList()
+        val orderedDates = linkedSetOf<String>()
+        val byDate = linkedMapOf<String, MutableList<ExpenseEntity>>()
+        expenses.forEach { expense ->
+            val key = expense.date
+            orderedDates.add(key)
+            byDate.getOrPut(key) { mutableListOf() }.add(expense)
+        }
+        return orderedDates.map { iso ->
+            ExpenseDayGroup(
+                header = dayHeaderLabel(iso, today),
+                isoDate = iso,
+                expenses = byDate[iso].orEmpty()
+            )
+        }
+    }
+
+    fun dayHeaderLabel(isoDate: String, today: LocalDate = DateRanges.today()): String {
+        val date = DateRanges.parseIso(isoDate) ?: return isoDate
+        val pretty = date.format(dayHeaderFmt)
+        return when (date) {
+            today -> "Today $pretty"
+            today.minusDays(1) -> "Yesterday $pretty"
+            else -> pretty
+        }
+    }
 }

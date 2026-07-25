@@ -7,9 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -236,8 +233,10 @@ private fun FloatingCapsuleBottomBar(
             shadowElevation = 0.dp
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 bottomNavDestinations.forEach { destination ->
@@ -245,7 +244,8 @@ private fun FloatingCapsuleBottomBar(
                     BottomNavPill(
                         destination = destination,
                         selected = selected,
-                        onClick = { onNavigate(destination) }
+                        onClick = { onNavigate(destination) },
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -257,7 +257,8 @@ private fun FloatingCapsuleBottomBar(
 private fun BottomNavPill(
     destination: AppDestination,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val pillColor by animateColorAsState(
         targetValue = if (selected) NeonTeal.copy(alpha = 0.18f) else Color.Transparent,
@@ -269,18 +270,9 @@ private fun BottomNavPill(
         animationSpec = tween(220),
         label = "navContent"
     )
-    val scale by animateFloatAsState(
-        targetValue = if (selected) 1f else 0.96f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = 420f),
-        label = "navScale"
-    )
 
     Column(
-        modifier = Modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
+        modifier = modifier
             .clip(RoundedCornerShape(20.dp))
             .background(pillColor)
             .clickable(
@@ -288,7 +280,7 @@ private fun BottomNavPill(
                 indication = ripple(bounded = true, color = NeonTeal),
                 onClick = onClick
             )
-            .padding(horizontal = 18.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
@@ -301,8 +293,9 @@ private fun BottomNavPill(
         Text(
             text = destination.label,
             style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = contentColor
+            fontWeight = FontWeight.Medium,
+            color = contentColor,
+            maxLines = 1
         )
     }
 }

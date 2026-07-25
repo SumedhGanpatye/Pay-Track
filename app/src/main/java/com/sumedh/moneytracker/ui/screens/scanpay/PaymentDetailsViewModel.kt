@@ -13,9 +13,12 @@ import com.sumedh.moneytracker.domain.upi.PaymentPreferences
 import com.sumedh.moneytracker.domain.upi.PaymentSession
 import com.sumedh.moneytracker.domain.upi.PendingUpiScan
 import com.sumedh.moneytracker.domain.upi.UpiApp
+import com.sumedh.moneytracker.domain.upi.UpiDebugLog
 import com.sumedh.moneytracker.domain.upi.UpiPaymentLauncher
 import com.sumedh.moneytracker.domain.upi.UpiQrParser
 import com.sumedh.moneytracker.service.ExpenseNotificationHelper
+import android.app.Activity
+import androidx.activity.result.ActivityResult
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -121,6 +124,18 @@ class PaymentDetailsViewModel(
             )
         }
 
+        UpiDebugLog.banner("PAYMENT DETAILS OPEN")
+        UpiDebugLog.section("PAYMENT_SCREEN")
+        UpiDebugLog.field("Merchant Name", merchant)
+        UpiDebugLog.field("UPI ID", upiId)
+        UpiDebugLog.field("Amount", amount)
+        UpiDebugLog.field("Note", _uiState.value.note)
+        UpiDebugLog.field("Selected Category", prefs.lastCategory)
+        UpiDebugLog.field("Selected UPI App", selected.displayName)
+        UpiDebugLog.field("Selected UPI Package", selected.packageName)
+        UpiDebugLog.field("amountLocked", (parsed?.amountLocked == true).toString())
+        UpiDebugLog.field("raw_pending_qr_length", raw.length.toString())
+
         syncDraft()
     }
 
@@ -180,7 +195,14 @@ class PaymentDetailsViewModel(
     }
 
     fun openAppSheet() {
-        _uiState.update { it.copy(showAppSheet = true) }
+        val apps = UpiPaymentLauncher.installedApps(getApplication())
+        UpiDebugLog.line("UPI chooser apps (${apps.size}): ${apps.joinToString { it.displayName }}")
+        _uiState.update {
+            it.copy(
+                availableApps = apps,
+                showAppSheet = true
+            )
+        }
     }
 
     fun dismissAppSheet() {
@@ -243,29 +265,111 @@ class PaymentDetailsViewModel(
     private fun launchPayment() {
         val state = _uiState.value
         val amount = state.amountInput.toDoubleOrNull() ?: return
+
+        UpiDebugLog.banner("PAY CLICKED — LAUNCH")
+        UpiDebugLog.section("PAYMENT_SCREEN_AT_LAUNCH")
+        UpiDebugLog.field("Merchant Name", state.merchantName)
+        UpiDebugLog.field("UPI ID", state.upiId)
+        UpiDebugLog.field("Amount", state.amountInput)
+        UpiDebugLog.field("Note", state.note)
+        UpiDebugLog.field("Selected Category", state.selectedCategory)
+        UpiDebugLog.field("Selected UPI App", state.selectedUpiApp.displayName)
+        UpiDebugLog.field("Selected UPI Package", state.selectedUpiApp.packageName)
+
+        val originalRawQr = PaymentSession.draft?.rawQr
+            ?.takeIf { it.isNotBlank() }
+            ?: PendingUpiScan.peek().orEmpty()
+        UpiDebugLog.field("original_raw_qr_present", originalRawQr.isNotBlank().toString())
+        UpiDebugLog.field("original_raw_qr_length", originalRawQr.length.toString())
+
+        val personalGpayQr = UpiPaymentLauncher.isLikelyPersonalGpayQr(
+            originalRawQr = originalRawQr,
+            upiId = state.upiId
+        )
+        if (personalGpayQr && state.selectedUpiApp == UpiApp.GOOGLE_PAY) {
+            _events.tryEmit(
+                PaymentDetailsEvent.ShowMessage(
+                    "GPay often blocks personal UPI from other apps. " +
+                        "If you see a bank-limit error, try PhonePe or BHIM."
+                )
+            )
+        }
+
         val intent = try {
             UpiPaymentLauncher.createPayIntent(
                 upiId = state.upiId,
                 merchantName = state.merchantName,
                 amount = amount,
                 note = state.note,
-                targetApp = state.selectedUpiApp
+                targetApp = state.selectedUpiApp,
+                originalRawQr = originalRawQr
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            UpiDebugLog.line("createPayIntent threw: ${e.message} — falling back to generic")
             UpiPaymentLauncher.createGenericPayIntent(
                 upiId = state.upiId,
                 merchantName = state.merchantName,
                 amount = amount,
-                note = state.note
+                note = state.note,
+                originalRawQr = originalRawQr
             )
         }
+        UpiPaymentLauncher.logIntentResolution(
+            context = getApplication(),
+            intent = intent,
+            targetPackage = intent.`package` ?: state.selectedUpiApp.packageName
+        )
         PaymentSession.markAwaitingReturn()
+        UpiDebugLog.line("awaitingUpiReturn = true — emitting LaunchUpi")
         _events.tryEmit(PaymentDetailsEvent.LaunchUpi(intent))
     }
 
-    fun onReturnedFromUpi() {
-        if (!PaymentSession.awaitingUpiReturn) return
+    fun onReturnedFromUpi(result: ActivityResult? = null, source: String = "unknown") {
+        UpiDebugLog.banner("UPI APP RETURNED")
+        UpiDebugLog.section("RESULT")
+        UpiDebugLog.field("source", source)
+        UpiDebugLog.field("awaitingUpiReturn", PaymentSession.awaitingUpiReturn.toString())
+
+        if (result != null) {
+            val code = result.resultCode
+            val codeLabel = when (code) {
+                Activity.RESULT_OK -> "RESULT_OK (-1)"
+                Activity.RESULT_CANCELED -> "RESULT_CANCELED (0)"
+                else -> "RESULT_$code"
+            }
+            UpiDebugLog.field("resultCode", codeLabel)
+            val data = result.data
+            UpiDebugLog.field("intent_returned", data?.toString())
+            UpiDebugLog.field("intent_data_uri", data?.dataString)
+            val extras = data?.extras
+            if (extras == null || extras.isEmpty) {
+                UpiDebugLog.line("  extras = <none>")
+            } else {
+                UpiDebugLog.line("  extras keys = ${extras.keySet()}")
+                for (key in extras.keySet()) {
+                    @Suppress("DEPRECATION")
+                    val value = extras.get(key)
+                    UpiDebugLog.field("extra[$key]", value?.toString())
+                }
+            }
+            // Common UPI response keys (may or may not be present)
+            listOf(
+                "response", "Status", "status", "txnId", "txnRef",
+                "ApprovalRefNo", "responseCode", "StatusCode"
+            ).forEach { key ->
+                val v = extras?.getString(key)
+                if (v != null) UpiDebugLog.field("upi_$key", v)
+            }
+        } else {
+            UpiDebugLog.line("  ActivityResult = <null> (likely ON_RESUME fallback; no result extras)")
+        }
+
+        if (!PaymentSession.awaitingUpiReturn) {
+            UpiDebugLog.line("ignored — not awaiting UPI return")
+            return
+        }
         PaymentSession.clearAwaitingReturn()
+        UpiDebugLog.line("showing payment status dialog")
         _uiState.update { it.copy(showReturnDialog = true) }
     }
 

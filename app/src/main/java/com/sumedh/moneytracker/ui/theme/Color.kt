@@ -42,7 +42,7 @@ val ErrorRed = Color(0xFFFF5C5C)
  */
 object CategoryColors {
     val Food = Color(0xFF4ADE9A)          // soft emerald
-    val Travel = Color(0xFF5B8DEF)        // royal blue
+    val Travel = Color(0xFF8B5CF6)        // violet
     val Shopping = Color(0xFFF0A35E)      // warm orange
     val Medical = Color(0xFFE57373)       // soft red
     val Fuel = Color(0xFFE6B84D)          // amber

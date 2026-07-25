@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.sumedh.moneytracker.domain.upi.PendingUpiScan
+import com.sumedh.moneytracker.domain.upi.UpiDebugLog
 import com.sumedh.moneytracker.domain.upi.UpiQrParser
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -93,8 +94,14 @@ class QrScannerViewModel : ViewModel() {
         if (!_uiState.value.scanningEnabled) return
         if (_uiState.value.phase != ScanPhase.Idle) return
 
+        UpiDebugLog.banner("SCAN DETECTED")
+        UpiDebugLog.section("RAW_QR")
+        UpiDebugLog.line(raw)
+        UpiDebugLog.field("raw_length", raw.length.toString())
+
         val parsed = UpiQrParser.parse(raw)
         if (parsed == null) {
+            UpiDebugLog.line("scan_outcome = INVALID (parser returned null)")
             val now = System.currentTimeMillis()
             if (now - lastInvalidAtMs > INVALID_THROTTLE_MS) {
                 lastInvalidAtMs = now
@@ -107,6 +114,7 @@ class QrScannerViewModel : ViewModel() {
             return
         }
 
+        UpiDebugLog.line("scan_outcome = VALID — storing PendingUpiScan")
         _uiState.update {
             it.copy(
                 scanningEnabled = false,
