@@ -1,16 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.FLASHLIGHT" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <uses-feature
-        android:name="android.hardware.camera"
-        android:required="false" />
-    <uses-feature
-        android:name="android.hardware.camera.flash"
-        android:required="false" />
 
     <queries>
         <package android:name="com.google.android.apps.nbu.paisa.user" />
@@ -19,10 +10,6 @@
         <package android:name="in.org.npci.upiapp" />
         <package android:name="in.amazon.mShop.android.shopping" />
         <package android:name="money.super.payments" />
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="upi" />
-        </intent>
     </queries>
 
     <application
@@ -33,11 +20,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MoneyTracker">
-
-        <!-- Unbundled ML Kit: download barcode model at install time -->
-        <meta-data
-            android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="barcode" />
 
         <activity
             android:name=".MainActivity"

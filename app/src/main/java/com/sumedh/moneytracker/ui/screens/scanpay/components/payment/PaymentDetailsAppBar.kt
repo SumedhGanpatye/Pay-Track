@@ -66,13 +66,13 @@ fun PaymentDetailsAppBar(
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(
-                    text = "Payment Details",
+                    text = "Pay with UPI",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = TextPrimary
                 )
                 Text(
-                    text = "Verify details before continuing",
+                    text = "Copy amount → open UPI → scan & paste",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )

@@ -49,14 +49,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sumedh.moneytracker.MoneyTrackerApp
 import com.sumedh.moneytracker.data.ExpenseRepository
-import com.sumedh.moneytracker.domain.upi.PaymentSession
 import com.sumedh.moneytracker.ui.screens.AnalysisScreen
 import com.sumedh.moneytracker.ui.screens.HomeScreen
 import com.sumedh.moneytracker.ui.screens.SettingsScreen
 import com.sumedh.moneytracker.ui.screens.account.AccountSignupScreen
 import com.sumedh.moneytracker.ui.screens.scanpay.PaymentDetailsScreen
-import com.sumedh.moneytracker.ui.screens.scanpay.PaymentSuccessScreen
-import com.sumedh.moneytracker.ui.screens.scanpay.QrScannerScreen
 import com.sumedh.moneytracker.ui.theme.BorderEmerald
 import com.sumedh.moneytracker.ui.theme.CardBackground
 import com.sumedh.moneytracker.ui.theme.NeonTeal
@@ -125,7 +122,7 @@ fun MoneyTrackerNavHost(
                     repository = repository,
                     username = profile.username,
                     onScanAndPay = {
-                        navController.navigate(ScanPayRoutes.SCANNER)
+                        navController.navigate(ScanPayRoutes.PAYMENT_DETAILS)
                     },
                     onViewAllExpenses = {
                         navController.navigate(AppDestination.Analysis.route) {
@@ -144,39 +141,14 @@ fun MoneyTrackerNavHost(
             composable(AppDestination.Settings.route) {
                 SettingsScreen(repository = repository)
             }
-            composable(ScanPayRoutes.SCANNER) {
-                QrScannerScreen(
-                    onBack = { navController.popBackStack() },
-                    onNavigateToPaymentDetails = {
-                        navController.navigate(ScanPayRoutes.PAYMENT_DETAILS) {
-                            launchSingleTop = true
-                        }
-                    }
-                )
-            }
             composable(ScanPayRoutes.PAYMENT_DETAILS) {
                 PaymentDetailsScreen(
                     repository = repository,
                     onBack = { navController.popBackStack() },
-                    onPaymentSuccess = {
-                        navController.navigate(ScanPayRoutes.PAYMENT_SUCCESS) {
-                            popUpTo(ScanPayRoutes.PAYMENT_DETAILS) { inclusive = true }
-                            launchSingleTop = true
-                        }
+                    onPaymentRecorded = {
+                        navController.popBackStack(AppDestination.Home.route, inclusive = false)
                     },
                     onGoHome = {
-                        navController.popBackStack(AppDestination.Home.route, inclusive = false)
-                    }
-                )
-            }
-            composable(ScanPayRoutes.PAYMENT_SUCCESS) {
-                PaymentSuccessScreen(
-                    onDone = {
-                        PaymentSession.clear()
-                        navController.popBackStack(AppDestination.Home.route, inclusive = false)
-                    },
-                    onViewExpense = {
-                        PaymentSession.clear()
                         navController.popBackStack(AppDestination.Home.route, inclusive = false)
                     }
                 )

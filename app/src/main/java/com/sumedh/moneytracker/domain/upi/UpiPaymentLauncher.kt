@@ -1,26 +1,19 @@
-﻿package com.sumedh.moneytracker.domain.upi
+package com.sumedh.moneytracker.domain.upi
 
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
-import java.util.UUID
+import android.os.PersistableBundle
 
 /**
- * Builds and launches UPI payment intents.
- *
- * Launch strategy (NPCI Linking Spec aligned):
- * 1. Prefer the original scanned URI and preserve merchant params (pa, pn, mc, tr, tid, …).
- * 2. Strip GPay camera-only `aid` (not part of the NPCI linking parameter set for Intent).
- * 3. Inject/replace only payer-controlled fields: am, cu, tn.
- * 4. Inject blank mc / synthetic tr only when the QR omitted them.
- * 5. Re-encode all values for Intent (spaces as %20); keep @ in VPA and / in names.
+ * Copies the pay amount to the clipboard, then opens the selected UPI app
+ * so keyboards / UPI apps can suggest it when the amount field is focused.
  */
 object UpiPaymentLauncher {
-
-    private val OVERRIDE_KEYS = setOf("am", "cu", "tn")
-    private val STRIP_KEYS = setOf("aid")
 
     fun isInstalled(context: Context, app: UpiApp): Boolean {
         return try {
@@ -44,241 +37,89 @@ object UpiPaymentLauncher {
         return installed.ifEmpty { UpiApp.entries.toList() }
     }
 
-    fun isLikelyPersonalGpayQr(originalRawQr: String?, upiId: String): Boolean {
-        val raw = originalRawQr.orEmpty()
-        val params = enumerateRawParams(raw).associate { it.key.lowercase() to it.rawValue }
-        val hasGpayAid = params["aid"]?.startsWith("uGICAg") == true
-        val mc = params["mc"]?.let { decodeParam(it) }.orEmpty()
-        val looksMerchantVpa = upiId.contains("okbizaxis", ignoreCase = true) ||
-            upiId.contains("@okbiz", ignoreCase = true)
-        return hasGpayAid && mc.isBlank() && !looksMerchantVpa
-    }
+    data class OpenAppResult(
+        val intent: Intent,
+        val clipboardAmount: String
+    )
 
-    fun createPayIntent(
-        upiId: String,
-        merchantName: String,
-        amount: Double,
-        note: String,
+    /**
+     * Copy [amount] to clipboard and open [targetApp]'s launcher.
+     */
+    fun createOpenAppIntent(
+        context: Context,
         targetApp: UpiApp,
-        originalRawQr: String? = null
-    ): Intent {
-        val uri = resolveLaunchUri(upiId, merchantName, amount, note, originalRawQr)
-        return Intent(Intent.ACTION_VIEW, uri).apply {
-            setPackage(targetApp.packageName)
-        }
-    }
+        amount: Double
+    ): OpenAppResult {
+        val amountText = formatClipboardAmount(amount)
+        copyAmountToClipboard(context, amountText)
 
-    fun createGenericPayIntent(
-        upiId: String,
-        merchantName: String,
-        amount: Double,
-        note: String,
-        originalRawQr: String? = null
-    ): Intent {
-        val uri = resolveLaunchUri(upiId, merchantName, amount, note, originalRawQr)
-        return Intent(Intent.ACTION_VIEW, uri)
-    }
+        UpiDebugLog.banner("COPY AMOUNT + OPEN UPI")
+        UpiDebugLog.field("app", targetApp.displayName)
+        UpiDebugLog.field("package", targetApp.packageName)
+        UpiDebugLog.field("clipboard_amount", amountText)
 
-    @Suppress("UNUSED_PARAMETER")
-    fun logIntentResolution(context: Context, intent: Intent, targetPackage: String?) {
-        // Kept for call-site compatibility.
-    }
-
-    private fun resolveLaunchUri(
-        upiId: String,
-        merchantName: String,
-        amount: Double,
-        note: String,
-        originalRawQr: String?
-    ): Uri {
-        val tn = note.trim().ifBlank { "Pay&Track" }.take(50)
-        val am = formatAmount(amount)
-        val cu = "INR"
-        val original = originalRawQr?.trim().orEmpty()
-        val originalParams = enumerateRawParams(original)
-        val originalMc = originalParams
-            .firstOrNull { it.key.equals("mc", ignoreCase = true) }
-            ?.let { decodeParam(it.rawValue) }
-        val originalTr = originalParams
-            .firstOrNull { it.key.equals("tr", ignoreCase = true) }
-            ?.let { decodeParam(it.rawValue) }
-            ?.takeIf { it.isNotBlank() }
-
-        val trToInject = originalTr ?: newTransactionRef()
-
-        val launchString = if (isUsableOriginalUpi(original)) {
-            patchOriginalUpiUri(
-                original = original,
-                am = am,
-                cu = cu,
-                tn = tn,
-                injectMcIfAbsent = originalMc == null,
-                mcIfAbsent = "",
-                injectTrIfAbsent = originalTr == null,
-                trIfAbsent = trToInject
-            )
-        } else {
-            buildFallbackUpiString(
-                upiId = upiId,
-                merchantName = merchantName,
-                am = am,
-                cu = cu,
-                tn = tn,
-                mc = "",
-                tr = trToInject
-            )
-        }
-
-        val parsed = Uri.parse(launchString)
-        UpiDebugLog.banner("URI LAUNCH STRATEGY")
-        UpiDebugLog.section("DIAGNOSIS")
-        UpiDebugLog.field("ORIGINAL_SCANNED", original.ifEmpty { "<none>" })
-        UpiDebugLog.field("tr_policy", if (originalTr != null) "PRESERVE merchant tr" else "INJECT synthetic tr")
-        UpiDebugLog.field("LAUNCH_URI", launchString)
-        UpiDebugLog.field("has_raw_spaces", launchString.contains(' ').toString())
-        UpiDebugLog.field("parsed_pa", parsed.getQueryParameter("pa"))
-        UpiDebugLog.field("parsed_pn", parsed.getQueryParameter("pn"))
-        UpiDebugLog.field("parsed_tr", parsed.getQueryParameter("tr"))
-        UpiDebugLog.field("parsed_mc", parsed.getQueryParameter("mc"))
-        UpiDebugLog.field("parsed_am", parsed.getQueryParameter("am"))
-
-        return parsed
-    }
-
-    /**
-     * Build an Intent-safe UPI URI from the scanned QR:
-     * - keep every original key (except stripped keys like aid)
-     * - never overwrite merchant tr/mc when present
-     * - always set/replace am, cu, tn
-     * - re-encode ALL values for Intent (NPCI: spaces must be %20)
-     */
-    fun patchOriginalUpiUri(
-        original: String,
-        am: String,
-        cu: String,
-        tn: String,
-        injectMcIfAbsent: Boolean,
-        mcIfAbsent: String,
-        injectTrIfAbsent: Boolean,
-        trIfAbsent: String
-    ): String {
-        val trimmed = original.trim()
-        val qIndex = trimmed.indexOf('?')
-        val base = if (qIndex >= 0) trimmed.substring(0, qIndex) else trimmed
-        val query = if (qIndex >= 0 && qIndex < trimmed.lastIndex) {
-            trimmed.substring(qIndex + 1)
-        } else {
-            ""
-        }
-
-        val overridesDecoded = linkedMapOf(
-            "am" to am,
-            "cu" to cu,
-            "tn" to tn
+        val launch = buildLaunchIntent(context, targetApp)
+        UpiDebugLog.field("intent", launch.toUri(0))
+        UpiDebugLog.field(
+            "resolved_activity",
+            launch.resolveActivity(context.packageManager)?.flattenToString()
         )
-        val seen = mutableSetOf<String>()
-        val parts = mutableListOf<String>()
 
-        if (query.isNotBlank()) {
-            query.split('&').filter { it.isNotEmpty() }.forEach { part ->
-                val eq = part.indexOf('=')
-                if (eq <= 0) return@forEach
-                val key = part.substring(0, eq)
-                val keyLower = key.lowercase()
-                if (keyLower in STRIP_KEYS) return@forEach
-
-                val decoded = when {
-                    keyLower in OVERRIDE_KEYS -> overridesDecoded.getValue(keyLower)
-                    else -> decodeParam(part.substring(eq + 1))
-                }
-                parts.add("$key=${encodeUpiQueryValue(decoded)}")
-                seen.add(keyLower)
-            }
-        }
-
-        overridesDecoded.forEach { (key, value) ->
-            if (key !in seen) {
-                parts.add("$key=${encodeUpiQueryValue(value)}")
-                seen.add(key)
-            }
-        }
-        if (injectMcIfAbsent && "mc" !in seen) {
-            parts.add("mc=${encodeUpiQueryValue(mcIfAbsent)}")
-        }
-        if (injectTrIfAbsent && "tr" !in seen) {
-            parts.add("tr=${encodeUpiQueryValue(trIfAbsent)}")
-        }
-
-        return if (parts.isEmpty()) base else "$base?${parts.joinToString("&")}"
-    }
-
-    private fun buildFallbackUpiString(
-        upiId: String,
-        merchantName: String,
-        am: String,
-        cu: String,
-        tn: String,
-        mc: String,
-        tr: String
-    ): String {
-        val q = listOf(
-            "pa=${encodeUpiQueryValue(upiId)}",
-            "pn=${encodeUpiQueryValue(merchantName)}",
-            "mc=${encodeUpiQueryValue(mc)}",
-            "tr=${encodeUpiQueryValue(tr)}",
-            "tn=${encodeUpiQueryValue(tn)}",
-            "am=${encodeUpiQueryValue(am)}",
-            "cu=${encodeUpiQueryValue(cu)}"
-        ).joinToString("&")
-        return "upi://pay?$q"
-    }
-
-    private fun isUsableOriginalUpi(original: String): Boolean {
-        if (original.isBlank()) return false
-        val lower = original.lowercase()
-        return lower.startsWith("upi://") || lower.startsWith("upi:") ||
-            (lower.contains("pa=") && lower.contains("pn="))
-    }
-
-    private data class RawParam(val key: String, val rawValue: String)
-
-    private fun enumerateRawParams(uriString: String): List<RawParam> {
-        if (uriString.isBlank()) return emptyList()
-        val qIndex = uriString.indexOf('?')
-        val query = if (qIndex >= 0 && qIndex < uriString.lastIndex) {
-            uriString.substring(qIndex + 1)
-        } else if (uriString.contains('=') && !uriString.contains("://")) {
-            uriString
-        } else {
-            return emptyList()
-        }
-        if (query.isBlank()) return emptyList()
-        return query.split('&')
-            .mapNotNull { part ->
-                if (part.isEmpty()) return@mapNotNull null
-                val eq = part.indexOf('=')
-                if (eq <= 0) return@mapNotNull null
-                RawParam(
-                    key = part.substring(0, eq),
-                    rawValue = part.substring(eq + 1)
-                )
-            }
-    }
-
-    private fun decodeParam(raw: String): String {
-        return runCatching {
-            java.net.URLDecoder.decode(raw.replace('+', ' '), Charsets.UTF_8.name())
-        }.getOrDefault(raw)
+        return OpenAppResult(intent = launch, clipboardAmount = amountText)
     }
 
     /**
-     * NPCI Linking Spec: spaces must be %20 for generated Intent/QR URIs.
-     * Keep @ (VPA) and / (names like M/S.) unencoded — common merchant QR practice.
+     * Puts a plain numeric amount on the system clipboard so Gboard / Samsung Keyboard /
+     * UPI apps can show a paste suggestion when the amount field is focused.
      */
-    private fun encodeUpiQueryValue(value: String): String = Uri.encode(value, "@/:._-")
+    fun copyAmountToClipboard(context: Context, amountText: String) {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("₹$amountText", amountText)
+        // Keep clip visible to other apps' paste / keyboard suggestions (not "sensitive").
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            clip.description.extras = PersistableBundle().apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false)
+                }
+            }
+        }
+        cm.setPrimaryClip(clip)
+        PaymentSession.lastClipboardAmount = amountText
+        UpiDebugLog.field("clipboard_set", amountText)
+    }
 
-    private fun formatAmount(amount: Double): String = String.format("%.2f", amount)
+    /** Re-copy draft amount (e.g. right as we leave for the UPI app). */
+    fun recopyDraftAmount(context: Context): String? {
+        val raw = PaymentSession.draft?.amount?.trim().orEmpty()
+        val value = raw.toDoubleOrNull() ?: return null
+        if (value <= 0.0) return null
+        val text = formatClipboardAmount(value)
+        copyAmountToClipboard(context, text)
+        return text
+    }
 
-    private fun newTransactionRef(): String =
-        "PT" + UUID.randomUUID().toString().replace("-", "").take(18)
+    private fun buildLaunchIntent(context: Context, targetApp: UpiApp): Intent {
+        val pm = context.packageManager
+        val fromPackage = pm.getLaunchIntentForPackage(targetApp.packageName)
+        if (fromPackage != null) {
+            return fromPackage.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            }
+        }
+        return Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            setPackage(targetApp.packageName)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        }
+    }
+
+    fun formatClipboardAmount(amount: Double): String {
+        return if (amount == amount.toLong().toDouble()) {
+            amount.toLong().toString()
+        } else {
+            String.format("%.2f", amount)
+        }
+    }
 }

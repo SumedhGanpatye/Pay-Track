@@ -1,18 +1,13 @@
 package com.sumedh.moneytracker.domain.upi
 
 /**
- * In-memory payment draft spanning scanner → details → UPI return.
+ * In-memory payment draft: amount / category / note → open UPI app → confirm.
  */
 data class PaymentDraft(
-    val rawQr: String,
-    val merchantName: String,
-    val upiId: String,
     val amount: String,
-    val amountLocked: Boolean,
     val category: String,
     val note: String,
-    val selectedUpiApp: UpiApp,
-    val verified: Boolean = true
+    val selectedUpiApp: UpiApp
 )
 
 object PaymentSession {
@@ -24,12 +19,12 @@ object PaymentSession {
     var awaitingUpiReturn: Boolean = false
         private set
 
+    /** Last amount we put on the clipboard for UPI paste suggestions. */
+    @Volatile
+    var lastClipboardAmount: String? = null
+
     fun setDraft(draft: PaymentDraft) {
         this.draft = draft
-    }
-
-    fun updateDraft(transform: (PaymentDraft) -> PaymentDraft) {
-        draft = draft?.let(transform)
     }
 
     fun markAwaitingReturn() {
@@ -43,6 +38,6 @@ object PaymentSession {
     fun clear() {
         draft = null
         awaitingUpiReturn = false
-        PendingUpiScan.consume()
+        lastClipboardAmount = null
     }
 }

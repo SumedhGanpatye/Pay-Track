@@ -1,25 +1,24 @@
 package com.sumedh.moneytracker.ui.screens.scanpay
 
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +33,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -44,16 +44,17 @@ import com.sumedh.moneytracker.MoneyTrackerApp
 import com.sumedh.moneytracker.data.ExpenseRepository
 import com.sumedh.moneytracker.domain.upi.PaymentSession
 import com.sumedh.moneytracker.domain.upi.UpiDebugLog
+import com.sumedh.moneytracker.domain.upi.UpiPaymentLauncher
 import com.sumedh.moneytracker.ui.components.AppScreenBackground
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.AmountSection
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.CategorySelector
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.CustomCategoryDialog
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.FloatingPayButton
-import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.MerchantCard
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.NoteInput
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.PaymentDetailsAppBar
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.PaymentMethodBottomSheet
 import com.sumedh.moneytracker.ui.screens.scanpay.components.payment.PaymentMethodCard
+import com.sumedh.moneytracker.ui.theme.Charcoal900
 import com.sumedh.moneytracker.ui.theme.ErrorRed
 import com.sumedh.moneytracker.ui.theme.NeonTeal
 import com.sumedh.moneytracker.ui.theme.TextSecondary
@@ -64,7 +65,7 @@ import kotlinx.coroutines.delay
 fun PaymentDetailsScreen(
     repository: ExpenseRepository,
     onBack: () -> Unit,
-    onPaymentSuccess: () -> Unit,
+    onPaymentRecorded: () -> Unit,
     onGoHome: () -> Unit,
     viewModel: PaymentDetailsViewModel = viewModel(
         factory = PaymentDetailsViewModel.factory(
@@ -86,30 +87,40 @@ fun PaymentDetailsScreen(
     val amountFocus = remember { FocusRequester() }
     val noteFocus = remember { FocusRequester() }
 
-    val upiLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        viewModel.onReturnedFromUpi(result = result, source = "StartActivityForResult")
-    }
-
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is PaymentDetailsEvent.LaunchUpi -> {
                     try {
-                        UpiDebugLog.line("launching UPI activity via StartActivityForResult…")
-                        upiLauncher.launch(event.intent)
+                        // Fresh copy right before leave so UPI / keyboard can suggest paste.
+                        UpiPaymentLauncher.recopyDraftAmount(context)
+                        UpiDebugLog.line("startActivity → selected UPI app")
+                        context.startActivity(event.intent)
+                        // One more copy after launch (some OEMs clear clip during activity switch).
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            UpiPaymentLauncher.recopyDraftAmount(context.applicationContext)
+                        }, 250)
                     } catch (e: Exception) {
-                        UpiDebugLog.line("UPI launch EXCEPTION: ${e.javaClass.simpleName}: ${e.message}")
-                        Toast.makeText(
-                            context,
-                            "Could not open ${uiState.selectedUpiApp.displayName}",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        PaymentSession.clearAwaitingReturn()
+                        UpiDebugLog.line(
+                            "UPI launch EXCEPTION: ${e.javaClass.simpleName}: ${e.message}"
+                        )
+                        try {
+                            UpiPaymentLauncher.recopyDraftAmount(context)
+                            context.startActivity(
+                                event.intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        } catch (e2: Exception) {
+                            Toast.makeText(
+                                context,
+                                "Could not open ${uiState.selectedUpiApp.displayName}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            PaymentSession.clearAwaitingReturn()
+                            UpiDebugLog.line("retry failed: ${e2.message}")
+                        }
                     }
                 }
-                PaymentDetailsEvent.NavigateSuccess -> onPaymentSuccess()
+                PaymentDetailsEvent.NavigateHomeAfterPaid -> onPaymentRecorded()
                 PaymentDetailsEvent.NavigateHome -> onGoHome()
                 is PaymentDetailsEvent.ShowMessage -> {
                     Toast.makeText(context, event.text, Toast.LENGTH_SHORT).show()
@@ -122,7 +133,7 @@ fun PaymentDetailsScreen(
         if (!uiState.isReady) return@LaunchedEffect
         delay(180)
         runCatching {
-            if (uiState.autofocusAmount && !uiState.amountLocked) {
+            if (uiState.autofocusAmount) {
                 amountFocus.requestFocus()
                 keyboard?.show()
             } else {
@@ -134,8 +145,19 @@ fun PaymentDetailsScreen(
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && PaymentSession.awaitingUpiReturn) {
-                viewModel.onReturnedFromUpi(result = null, source = "Lifecycle.ON_RESUME")
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    // Keep amount on clipboard while switching to UPI so paste chips appear.
+                    if (PaymentSession.awaitingUpiReturn) {
+                        UpiPaymentLauncher.recopyDraftAmount(context.applicationContext)
+                    }
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    if (PaymentSession.awaitingUpiReturn) {
+                        viewModel.onReturnedFromUpi(result = null, source = "Lifecycle.ON_RESUME")
+                    }
+                }
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -162,15 +184,25 @@ fun PaymentDetailsScreen(
                         .verticalScroll(scrollState)
                         .padding(horizontal = 20.dp)
                         .navigationBarsPadding()
-                        // Keep last fields clear of the floating Pay button
                         .padding(bottom = 88.dp)
                 ) {
                     Spacer(modifier = Modifier.height(6.dp))
 
+                    Text(
+                        text = "1. Enter amount, category & note\n" +
+                            "2. Tap Copy & open — amount is copied for paste suggestions\n" +
+                            "3. In the UPI app, scan the merchant QR\n" +
+                            "4. Tap the amount field — choose the clipboard / paste chip",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     AmountSection(
                         amount = uiState.amountInput,
                         onAmountChange = viewModel::onAmountChange,
-                        readOnly = uiState.amountLocked,
+                        readOnly = false,
                         showError = uiState.amountError,
                         focusRequester = amountFocus
                     )
@@ -196,21 +228,6 @@ fun PaymentDetailsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 12 }
-                    ) {
-                        Column {
-                            MerchantCard(
-                                merchantName = uiState.merchantName.ifBlank { "Unknown merchant" },
-                                upiId = uiState.upiId.ifBlank { "UPI ID unavailable" },
-                                verified = uiState.verified && uiState.upiId.isNotBlank()
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
                     PaymentMethodCard(
                         selectedApp = uiState.selectedUpiApp,
                         onClick = viewModel::openAppSheet
@@ -221,7 +238,7 @@ fun PaymentDetailsScreen(
 
                 FloatingPayButton(
                     amount = amountValue,
-                    enabled = amountReady && uiState.upiId.isNotBlank(),
+                    enabled = amountReady,
                     visible = uiState.isReady,
                     onClick = viewModel::onPayClicked,
                     modifier = Modifier.align(Alignment.BottomEnd)
@@ -249,25 +266,53 @@ fun PaymentDetailsScreen(
     }
 
     if (uiState.showReturnDialog) {
+        val paidAmount = uiState.amountInput.toDoubleOrNull()
+        val paidLabel = paidAmount?.let {
+            com.sumedh.moneytracker.util.ExpenseAnalytics.formatInr(it)
+        } ?: "this amount"
         AlertDialog(
-            onDismissRequest = viewModel::dismissReturnDialog,
-            title = { Text("Payment status") },
-            text = {
+            onDismissRequest = { /* require an explicit choice */ },
+            title = {
                 Text(
-                    "Did you complete this payment in ${uiState.selectedUpiApp.displayName}?",
-                    color = TextSecondary
+                    "Did you pay $paidLabel?",
+                    fontWeight = FontWeight.SemiBold
                 )
             },
-            confirmButton = {
-                TextButton(onClick = viewModel::onPaymentConfirmedSuccessful) {
-                    Text("Yes, paid", color = NeonTeal)
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Confirm if the payment went through in ${uiState.selectedUpiApp.displayName}.",
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        onClick = viewModel::onPaymentConfirmedSuccessful,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = NeonTeal,
+                            contentColor = Charcoal900
+                        )
+                    ) {
+                        Text(
+                            "Yes, paid",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    TextButton(
+                        onClick = viewModel::onPaymentCancelled,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("No, cancelled", color = ErrorRed)
+                    }
                 }
             },
-            dismissButton = {
-                TextButton(onClick = viewModel::onPaymentCancelled) {
-                    Text("No, cancelled", color = ErrorRed)
-                }
-            }
+            confirmButton = {},
+            dismissButton = {}
         )
     }
 

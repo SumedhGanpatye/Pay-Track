@@ -27,7 +27,7 @@ import androidx.compose.ui.res.vectorResource
 import com.sumedh.moneytracker.R
 
 /**
- * Icons from material-icons-core plus small custom vectors for flash / gallery / categories.
+ * Icons from material-icons-core plus small custom category vectors.
  */
 object AppIcons {
     val Home: ImageVector = Icons.Outlined.Home
@@ -44,18 +44,6 @@ object AppIcons {
     val DateRange: ImageVector = Icons.Outlined.DateRange
     val Refresh: ImageVector = Icons.Outlined.Refresh
     val More: ImageVector = Icons.Outlined.MoreVert
-
-    @DrawableRes
-    fun flashRes(torchOn: Boolean): Int =
-        if (torchOn) R.drawable.ic_flash_on else R.drawable.ic_flash_off
-
-    @Composable
-    fun flash(torchOn: Boolean): ImageVector =
-        ImageVector.vectorResource(flashRes(torchOn))
-
-    @Composable
-    fun gallery(): ImageVector =
-        ImageVector.vectorResource(R.drawable.ic_gallery)
 
     @Composable
     fun category(category: String): ImageVector {

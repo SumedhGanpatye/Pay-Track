@@ -23,7 +23,5 @@ val bottomNavDestinations: List<AppDestination> = listOf(
 )
 
 object ScanPayRoutes {
-    const val SCANNER = "scan_pay/scanner"
     const val PAYMENT_DETAILS = "scan_pay/payment_details"
-    const val PAYMENT_SUCCESS = "scan_pay/payment_success"
 }

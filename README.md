@@ -4,7 +4,7 @@ Private, offline personal expense tracker for Android — Kotlin, Jetpack Compos
 
 ## Features
 
-- **Scan & Pay** — in-app UPI QR scan (CameraX + ML Kit), payment details, launch GPay / PhonePe / Paytm / BHIM
+- **Pay with UPI** — enter amount / category / note, copy amount, open GPay / PhonePe / Paytm / BHIM, confirm after paying
 - **Quick Add** — log expenses manually from Home
 - **Analytics** — category spend charts and period averages
 - **Settings** — profile, UPI defaults, export CSV, clear data, logout
@@ -20,14 +20,14 @@ Private, offline personal expense tracker for Android — Kotlin, Jetpack Compos
 | Layer | Responsibility |
 |-------|----------------|
 | `data/` | Room entity, DAO, database, repository |
-| `domain/` | UPI parsing/launch, preferences, profile, categories |
+| `domain/` | UPI app launch + clipboard, preferences, profile, categories |
 | `ui/screens/` | Home, Analysis, Settings, account signup |
-| `ui/screens/scanpay/` | QR scanner, payment details, success |
-| `service/` | Expense-added system notifications |
+| `ui/screens/scanpay/` | Pay with UPI (payment details) |
+| `service/` | Expense-recorded system notifications |
 
 ## Privacy
 
-- User-initiated actions only — no Accessibility Service  
+- User-initiated actions only — no Accessibility Service / Notification Listener  
 - No overlay / third-party app monitoring  
 - Expense data stays in on-device Room SQLite  
 

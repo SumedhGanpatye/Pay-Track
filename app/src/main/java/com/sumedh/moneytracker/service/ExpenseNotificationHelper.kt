@@ -16,13 +16,13 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Shared system notification for successful expense saves (Quick Add + QR/UPI).
+ * Shared system notification for successful expense saves (Quick Add + UPI).
  */
 object ExpenseNotificationHelper {
 
     private const val CHANNEL_ID = "expense_added_system"
     private const val GROUP_KEY = "expense_added_group"
-    private const val TITLE = "Expense Added"
+    private const val TITLE = "Expense Recorded"
     private val nextId = AtomicInteger(4300)
 
     fun ensureChannel(context: Context) {
@@ -33,7 +33,7 @@ object ExpenseNotificationHelper {
             "Expense alerts",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "System notifications when an expense is added"
+            description = "System notifications when an expense is recorded"
             enableVibration(true)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
@@ -41,11 +41,11 @@ object ExpenseNotificationHelper {
     }
 
     /**
-     * Posts one expense-added notification.
+     * Posts one expense-recorded notification.
      * Call only after the expense row is successfully inserted.
      *
-     * @param note User-entered note only; pass null/blank when the note field is empty
-     *             so the message omits the "for …" clause.
+     * @param note User-entered note only; pass null/blank when empty
+     *             so the message omits the trailing "for …" clause.
      */
     fun showExpenseAdded(
         context: Context,
@@ -88,13 +88,11 @@ object ExpenseNotificationHelper {
     }
 
     /**
-     * Shared copy for Quick Add and QR payment success notifications.
-     *
-     * Empty note → "₹88 was added to Food."
-     * With note  → "₹88 was added to Food for Vadapav."
+     * Empty note → "Rs 2 was added for Food"
+     * With note  → "Rs 2 was added for Food for vadapav"
      */
     fun buildExpenseAddedMessage(amount: Double, category: String, note: String?): String {
-        val amountLabel = ExpenseAnalytics.formatInr(amount)
+        val amountLabel = "Rs ${ExpenseAnalytics.formatIndianNumber(amount)}"
         val categoryLabel = when (category.trim().lowercase(Locale.US)) {
             "others", "other" -> "Other"
             else -> category.trim().ifBlank { "Other" }
@@ -103,12 +101,12 @@ object ExpenseNotificationHelper {
         return if (
             trimmedNote.isEmpty() ||
             trimmedNote.equals(categoryLabel, ignoreCase = true) ||
-            trimmedNote.equals("Others", ignoreCase = true)
+            trimmedNote.equals("Others", ignoreCase = true) ||
+            trimmedNote.equals("UPI payment", ignoreCase = true)
         ) {
-            "$amountLabel was added to $categoryLabel."
+            "$amountLabel was added for $categoryLabel"
         } else {
-            "$amountLabel was added to $categoryLabel for $trimmedNote."
+            "$amountLabel was added for $categoryLabel for $trimmedNote"
         }
     }
-
 }

@@ -11,11 +11,6 @@
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 
-# ML Kit barcode (unbundled Play Services model)
--keep class com.google.mlkit.** { *; }
--dontwarn com.google.mlkit.**
--keep class com.google.android.gms.internal.mlkit_vision_barcode.** { *; }
-
 # Compose – keep metadata used by runtime
 -keep class androidx.compose.runtime.** { *; }
 

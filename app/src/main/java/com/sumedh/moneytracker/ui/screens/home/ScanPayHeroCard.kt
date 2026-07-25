@@ -114,14 +114,14 @@ fun ScanPayHeroCard(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Scan & Pay",
+                        text = "Pay with UPI",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Scan any UPI QR, pay securely and organize your expense.",
+                        text = "Amount copied — open UPI, scan QR, paste & pay.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary,
                         maxLines = 2
@@ -130,7 +130,7 @@ fun ScanPayHeroCard(
 
                 Icon(
                     imageVector = AppIcons.ChevronRight,
-                    contentDescription = "Open Scan & Pay",
+                    contentDescription = "Open Pay with UPI",
                     tint = NeonTeal,
                     modifier = Modifier.size(22.dp)
                 )

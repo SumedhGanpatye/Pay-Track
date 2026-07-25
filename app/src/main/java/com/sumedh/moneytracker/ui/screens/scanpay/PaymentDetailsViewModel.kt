@@ -1,6 +1,8 @@
 package com.sumedh.moneytracker.ui.screens.scanpay
 
+import android.app.Activity
 import android.app.Application
+import androidx.activity.result.ActivityResult
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -11,14 +13,10 @@ import com.sumedh.moneytracker.domain.expense.CustomCategoryStore
 import com.sumedh.moneytracker.domain.upi.PaymentDraft
 import com.sumedh.moneytracker.domain.upi.PaymentPreferences
 import com.sumedh.moneytracker.domain.upi.PaymentSession
-import com.sumedh.moneytracker.domain.upi.PendingUpiScan
 import com.sumedh.moneytracker.domain.upi.UpiApp
 import com.sumedh.moneytracker.domain.upi.UpiDebugLog
 import com.sumedh.moneytracker.domain.upi.UpiPaymentLauncher
-import com.sumedh.moneytracker.domain.upi.UpiQrParser
 import com.sumedh.moneytracker.service.ExpenseNotificationHelper
-import android.app.Activity
-import androidx.activity.result.ActivityResult
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -32,11 +30,7 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 data class PaymentDetailsUiState(
-    val merchantName: String = "",
-    val upiId: String = "",
-    val verified: Boolean = true,
     val amountInput: String = "",
-    val amountLocked: Boolean = false,
     val selectedCategory: String? = null,
     val customCategories: List<String> = emptyList(),
     val showCustomCategoryDialog: Boolean = false,
@@ -50,14 +44,13 @@ data class PaymentDetailsUiState(
     val categoryShake: Boolean = false,
     val showReturnDialog: Boolean = false,
     val showCancelDialog: Boolean = false,
-    val isReady: Boolean = false,
-    /** true → focus amount; false → focus note (amount already present). */
+    val isReady: Boolean = true,
     val autofocusAmount: Boolean = true
 )
 
 sealed interface PaymentDetailsEvent {
     data class LaunchUpi(val intent: android.content.Intent) : PaymentDetailsEvent
-    data object NavigateSuccess : PaymentDetailsEvent
+    data object NavigateHomeAfterPaid : PaymentDetailsEvent
     data object NavigateHome : PaymentDetailsEvent
     data class ShowMessage(val text: String) : PaymentDetailsEvent
 }
@@ -76,11 +69,10 @@ class PaymentDetailsViewModel(
     val events: SharedFlow<PaymentDetailsEvent> = _events.asSharedFlow()
 
     private var pendingPayAfterSheet: Boolean = false
-    /** Prevents duplicate DB inserts / notifications on double-tap of "Yes, paid". */
     private var completedSaveInFlight: Boolean = false
 
     init {
-        hydrateFromScan()
+        hydrate()
         viewModelScope.launch {
             customCategoryStore.custom.collect { customs ->
                 _uiState.update { it.copy(customCategories = customs) }
@@ -88,7 +80,7 @@ class PaymentDetailsViewModel(
         }
     }
 
-    private fun hydrateFromScan() {
+    private fun hydrate() {
         val prefs = paymentPreferences.current()
         val apps = UpiPaymentLauncher.installedApps(getApplication())
         val selected = if (apps.contains(prefs.defaultUpiApp)) {
@@ -97,50 +89,22 @@ class PaymentDetailsViewModel(
             apps.firstOrNull() ?: UpiApp.GOOGLE_PAY
         }
 
-        val raw = PendingUpiScan.peek().orEmpty()
-        val parsed = UpiQrParser.parse(raw)
-        val merchant = parsed?.payeeName?.takeIf { it.isNotBlank() }
-            ?: parsed?.payeeAddress?.substringBefore('@')?.replaceFirstChar { it.uppercase() }
-            ?: "Merchant"
-        val upiId = parsed?.payeeAddress.orEmpty()
-        val amount = parsed?.amount.orEmpty()
-        val amountPresent = amount.toDoubleOrNull()?.let { it > 0 } == true
-
         _uiState.update {
             it.copy(
-                merchantName = merchant,
-                upiId = upiId,
-                verified = upiId.isNotBlank(),
-                amountInput = amount,
-                amountLocked = parsed?.amountLocked == true,
                 selectedCategory = prefs.lastCategory,
                 selectedUpiApp = selected,
                 availableApps = apps,
                 customCategories = customCategoryStore.current(),
                 saveAsDefaultChecked = true,
                 askBeforeEveryPayment = prefs.askBeforeEveryPayment,
-                isReady = upiId.isNotBlank(),
-                autofocusAmount = !amountPresent
+                isReady = true,
+                autofocusAmount = true
             )
         }
-
-        UpiDebugLog.banner("PAYMENT DETAILS OPEN")
-        UpiDebugLog.section("PAYMENT_SCREEN")
-        UpiDebugLog.field("Merchant Name", merchant)
-        UpiDebugLog.field("UPI ID", upiId)
-        UpiDebugLog.field("Amount", amount)
-        UpiDebugLog.field("Note", _uiState.value.note)
-        UpiDebugLog.field("Selected Category", prefs.lastCategory)
-        UpiDebugLog.field("Selected UPI App", selected.displayName)
-        UpiDebugLog.field("Selected UPI Package", selected.packageName)
-        UpiDebugLog.field("amountLocked", (parsed?.amountLocked == true).toString())
-        UpiDebugLog.field("raw_pending_qr_length", raw.length.toString())
-
         syncDraft()
     }
 
     fun onAmountChange(value: String) {
-        if (_uiState.value.amountLocked) return
         val filtered = value.filter { it.isDigit() || it == '.' }
             .let { raw ->
                 val parts = raw.split('.')
@@ -153,9 +117,7 @@ class PaymentDetailsViewModel(
 
     fun onPrimaryCategorySelected(label: String) {
         paymentPreferences.setLastCategory(label)
-        _uiState.update {
-            it.copy(selectedCategory = label, categoryShake = false)
-        }
+        _uiState.update { it.copy(selectedCategory = label, categoryShake = false) }
         syncDraft()
     }
 
@@ -183,9 +145,7 @@ class PaymentDetailsViewModel(
 
     fun onCustomCategorySelected(label: String) {
         paymentPreferences.setLastCategory(label)
-        _uiState.update {
-            it.copy(selectedCategory = label, categoryShake = false)
-        }
+        _uiState.update { it.copy(selectedCategory = label, categoryShake = false) }
         syncDraft()
     }
 
@@ -196,13 +156,7 @@ class PaymentDetailsViewModel(
 
     fun openAppSheet() {
         val apps = UpiPaymentLauncher.installedApps(getApplication())
-        UpiDebugLog.line("UPI chooser apps (${apps.size}): ${apps.joinToString { it.displayName }}")
-        _uiState.update {
-            it.copy(
-                availableApps = apps,
-                showAppSheet = true
-            )
-        }
+        _uiState.update { it.copy(availableApps = apps, showAppSheet = true) }
     }
 
     fun dismissAppSheet() {
@@ -215,9 +169,7 @@ class PaymentDetailsViewModel(
     }
 
     fun onUpiAppSelected(app: UpiApp) {
-        _uiState.update {
-            it.copy(selectedUpiApp = app, showAppSheet = false)
-        }
+        _uiState.update { it.copy(selectedUpiApp = app, showAppSheet = false) }
         if (_uiState.value.saveAsDefaultChecked) {
             paymentPreferences.setDefaultUpiApp(app)
         }
@@ -235,10 +187,6 @@ class PaymentDetailsViewModel(
         }
         if (state.selectedCategory.isNullOrBlank()) {
             _uiState.update { it.copy(categoryShake = true) }
-            valid = false
-        }
-        if (state.upiId.isBlank()) {
-            _events.tryEmit(PaymentDetailsEvent.ShowMessage("Merchant UPI ID missing"))
             valid = false
         }
         if (!valid) return
@@ -266,110 +214,59 @@ class PaymentDetailsViewModel(
         val state = _uiState.value
         val amount = state.amountInput.toDoubleOrNull() ?: return
 
-        UpiDebugLog.banner("PAY CLICKED — LAUNCH")
-        UpiDebugLog.section("PAYMENT_SCREEN_AT_LAUNCH")
-        UpiDebugLog.field("Merchant Name", state.merchantName)
-        UpiDebugLog.field("UPI ID", state.upiId)
+        UpiDebugLog.banner("PAY — OPEN UPI APP")
         UpiDebugLog.field("Amount", state.amountInput)
-        UpiDebugLog.field("Note", state.note)
-        UpiDebugLog.field("Selected Category", state.selectedCategory)
-        UpiDebugLog.field("Selected UPI App", state.selectedUpiApp.displayName)
-        UpiDebugLog.field("Selected UPI Package", state.selectedUpiApp.packageName)
+        UpiDebugLog.field("Category", state.selectedCategory)
+        UpiDebugLog.field("Note", state.note.ifBlank { "<blank>" })
+        UpiDebugLog.field("UPI App", state.selectedUpiApp.displayName)
 
-        val originalRawQr = PaymentSession.draft?.rawQr
-            ?.takeIf { it.isNotBlank() }
-            ?: PendingUpiScan.peek().orEmpty()
-        UpiDebugLog.field("original_raw_qr_present", originalRawQr.isNotBlank().toString())
-        UpiDebugLog.field("original_raw_qr_length", originalRawQr.length.toString())
-
-        val personalGpayQr = UpiPaymentLauncher.isLikelyPersonalGpayQr(
-            originalRawQr = originalRawQr,
-            upiId = state.upiId
-        )
-        if (personalGpayQr && state.selectedUpiApp == UpiApp.GOOGLE_PAY) {
-            _events.tryEmit(
-                PaymentDetailsEvent.ShowMessage(
-                    "GPay often blocks personal UPI from other apps. " +
-                        "If you see a bank-limit error, try PhonePe or BHIM."
-                )
-            )
-        }
-
-        val intent = try {
-            UpiPaymentLauncher.createPayIntent(
-                upiId = state.upiId,
-                merchantName = state.merchantName,
-                amount = amount,
-                note = state.note,
+        val result = try {
+            UpiPaymentLauncher.createOpenAppIntent(
+                context = getApplication(),
                 targetApp = state.selectedUpiApp,
-                originalRawQr = originalRawQr
+                amount = amount
             )
         } catch (e: Exception) {
-            UpiDebugLog.line("createPayIntent threw: ${e.message} — falling back to generic")
-            UpiPaymentLauncher.createGenericPayIntent(
-                upiId = state.upiId,
-                merchantName = state.merchantName,
-                amount = amount,
-                note = state.note,
-                originalRawQr = originalRawQr
+            UpiDebugLog.line("open app failed: ${e.message}")
+            _events.tryEmit(
+                PaymentDetailsEvent.ShowMessage(
+                    "Could not open ${state.selectedUpiApp.displayName}"
+                )
             )
+            return
         }
-        UpiPaymentLauncher.logIntentResolution(
-            context = getApplication(),
-            intent = intent,
-            targetPackage = intent.`package` ?: state.selectedUpiApp.packageName
-        )
+
         PaymentSession.markAwaitingReturn()
-        UpiDebugLog.line("awaitingUpiReturn = true — emitting LaunchUpi")
-        _events.tryEmit(PaymentDetailsEvent.LaunchUpi(intent))
+        _events.tryEmit(PaymentDetailsEvent.LaunchUpi(result.intent))
+        _events.tryEmit(
+            PaymentDetailsEvent.ShowMessage(
+                "₹${result.clipboardAmount} copied — tap paste in UPI amount field"
+            )
+        )
     }
 
     fun onReturnedFromUpi(result: ActivityResult? = null, source: String = "unknown") {
         UpiDebugLog.banner("UPI APP RETURNED")
-        UpiDebugLog.section("RESULT")
         UpiDebugLog.field("source", source)
         UpiDebugLog.field("awaitingUpiReturn", PaymentSession.awaitingUpiReturn.toString())
 
         if (result != null) {
             val code = result.resultCode
-            val codeLabel = when (code) {
-                Activity.RESULT_OK -> "RESULT_OK (-1)"
-                Activity.RESULT_CANCELED -> "RESULT_CANCELED (0)"
-                else -> "RESULT_$code"
-            }
-            UpiDebugLog.field("resultCode", codeLabel)
-            val data = result.data
-            UpiDebugLog.field("intent_returned", data?.toString())
-            UpiDebugLog.field("intent_data_uri", data?.dataString)
-            val extras = data?.extras
-            if (extras == null || extras.isEmpty) {
-                UpiDebugLog.line("  extras = <none>")
-            } else {
-                UpiDebugLog.line("  extras keys = ${extras.keySet()}")
-                for (key in extras.keySet()) {
-                    @Suppress("DEPRECATION")
-                    val value = extras.get(key)
-                    UpiDebugLog.field("extra[$key]", value?.toString())
+            UpiDebugLog.field(
+                "resultCode",
+                when (code) {
+                    Activity.RESULT_OK -> "RESULT_OK"
+                    Activity.RESULT_CANCELED -> "RESULT_CANCELED"
+                    else -> "RESULT_$code"
                 }
-            }
-            // Common UPI response keys (may or may not be present)
-            listOf(
-                "response", "Status", "status", "txnId", "txnRef",
-                "ApprovalRefNo", "responseCode", "StatusCode"
-            ).forEach { key ->
-                val v = extras?.getString(key)
-                if (v != null) UpiDebugLog.field("upi_$key", v)
-            }
-        } else {
-            UpiDebugLog.line("  ActivityResult = <null> (likely ON_RESUME fallback; no result extras)")
+            )
         }
 
-        if (!PaymentSession.awaitingUpiReturn) {
-            UpiDebugLog.line("ignored — not awaiting UPI return")
-            return
-        }
+        if (!PaymentSession.awaitingUpiReturn) return
+        if (completedSaveInFlight) return
+        if (_uiState.value.showReturnDialog || _uiState.value.showCancelDialog) return
+
         PaymentSession.clearAwaitingReturn()
-        UpiDebugLog.line("showing payment status dialog")
         _uiState.update { it.copy(showReturnDialog = true) }
     }
 
@@ -380,7 +277,7 @@ class PaymentDetailsViewModel(
         viewModelScope.launch {
             val saved = saveExpense(status = ExpenseEntity.STATUS_COMPLETED)
             if (saved) {
-                _events.emit(PaymentDetailsEvent.NavigateSuccess)
+                _events.emit(PaymentDetailsEvent.NavigateHomeAfterPaid)
             } else {
                 completedSaveInFlight = false
             }
@@ -408,16 +305,6 @@ class PaymentDetailsViewModel(
         }
     }
 
-    fun dismissReturnDialog() {
-        _uiState.update { it.copy(showReturnDialog = false) }
-    }
-
-    /**
-     * Persists the expense. Notification is shown only for completed UPI payments
-     * after a successful insert — never for cancel / pending / failed saves.
-     *
-     * @return true if a row was inserted
-     */
     private suspend fun saveExpense(status: String): Boolean {
         val state = _uiState.value
         val amount = state.amountInput.toDoubleOrNull() ?: return false
@@ -425,7 +312,7 @@ class PaymentDetailsViewModel(
         val category = state.selectedCategory?.trim().orEmpty().ifBlank { "Others" }
         paymentPreferences.setLastCategory(category)
         val userNote = state.note.trim()
-        val baseNote = userNote.ifBlank { state.merchantName }
+        val baseNote = userNote.ifBlank { "UPI payment" }
         val note = if (status == ExpenseEntity.STATUS_PENDING) {
             "Pending · $baseNote"
         } else {
@@ -446,34 +333,25 @@ class PaymentDetailsViewModel(
             )
         )
         if (status == ExpenseEntity.STATUS_COMPLETED) {
-            // Same helper / channel / copy as Quick Add; user note only (not merchant fallback).
             ExpenseNotificationHelper.showExpenseAdded(
                 context = getApplication(),
                 amount = amount,
                 category = category,
                 note = userNote.ifBlank { null }
             )
-            PendingUpiScan.consume()
-        } else {
-            PaymentSession.clear()
         }
+        PaymentSession.clear()
         return true
     }
 
     private fun syncDraft() {
         val state = _uiState.value
-        if (state.upiId.isBlank()) return
         PaymentSession.setDraft(
             PaymentDraft(
-                rawQr = PendingUpiScan.peek().orEmpty(),
-                merchantName = state.merchantName,
-                upiId = state.upiId,
                 amount = state.amountInput,
-                amountLocked = state.amountLocked,
                 category = state.selectedCategory.orEmpty(),
                 note = state.note,
-                selectedUpiApp = state.selectedUpiApp,
-                verified = state.verified
+                selectedUpiApp = state.selectedUpiApp
             )
         )
     }

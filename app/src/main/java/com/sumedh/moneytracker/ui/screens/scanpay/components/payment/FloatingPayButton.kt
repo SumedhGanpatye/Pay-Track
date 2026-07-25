@@ -53,9 +53,9 @@ fun FloatingPayButton(
     modifier: Modifier = Modifier
 ) {
     val label = if (amount != null && amount > 0) {
-        "Pay ${ExpenseAnalytics.formatInr(amount)}"
+        "Copy & open · ${ExpenseAnalytics.formatInr(amount)}"
     } else {
-        "Pay"
+        "Copy & open UPI"
     }
     val haptics = LocalHapticFeedback.current
     val elevation by animateDpAsState(

@@ -18,7 +18,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Phone ABIs only — drops ~11 MB of emulator (x86/x86_64) ML Kit natives
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
@@ -97,15 +96,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
 
     implementation("androidx.navigation:navigation-compose:2.8.5")
-
-    val cameraVersion = "1.4.1"
-    implementation("androidx.camera:camera-core:$cameraVersion")
-    implementation("androidx.camera:camera-camera2:$cameraVersion")
-    implementation("androidx.camera:camera-lifecycle:$cameraVersion")
-    implementation("androidx.camera:camera-view:$cameraVersion")
-    implementation("androidx.camera:camera-mlkit-vision:$cameraVersion")
-    // Unbundled ML Kit — model via Play Services (~0.2 MB vs ~2.4+ MB bundled natives)
-    implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1")
 
     val roomVersion = "2.6.1"
     implementation("androidx.room:room-runtime:$roomVersion")
