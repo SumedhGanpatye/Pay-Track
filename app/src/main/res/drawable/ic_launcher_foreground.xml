@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Soft teal plate behind wallet -->
+    <path
+        android:fillColor="#00D6A2"
+        android:fillAlpha="0.18"
+        android:pathData="M30,34h48c6,0 10,4 10,10v28c0,6 -4,10 -10,10H30c-6,0 -10,-4 -10,-10V44c0,-6 4,-10 10,-10z" />
+
+    <!-- Wallet body -->
+    <path
+        android:fillColor="#00D6A2"
+        android:pathData="M32,38h44c4.4,0 8,3.6 8,8v28c0,4.4 -3.6,8 -8,8H32c-4.4,0 -8,-3.6 -8,-8V46c0,-4.4 3.6,-8 8,-8z" />
+
+    <!-- Inner charcoal panel -->
+    <path
+        android:fillColor="#0B0F13"
+        android:pathData="M36,44h36c2.2,0 4,1.8 4,4v20c0,2.2 -1.8,4 -4,4H36c-2.2,0 -4,-1.8 -4,-4V48c0,-2.2 1.8,-4 4,-4z" />
+
+    <!-- Card / cash strip -->
+    <path
+        android:fillColor="#00D6A2"
+        android:pathData="M36,48h36v5H36z" />
+
+    <!-- Wallet flap clasp (circle) -->
+    <path
+        android:fillColor="#00D6A2"
+        android:pathData="M72,60m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
+    <path
+        android:fillColor="#0B0F13"
+        android:pathData="M72,60m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+
+    <!-- Bold ₹ on the wallet -->
+    <path
+        android:fillColor="#00D6A2"
+        android:pathData="M42,56h14v2.8h-5.2c1.1,0.9 1.9,2.1 2.2,3.5H56v2.8h-5.4c-0.4,2.5 -2.2,4.3 -4.9,5.2L50,76h-3.6l-3.6,-5H42v-2.8h1.8c1.9,0 3.1,-0.9 3.4,-2.5H42V65.8h5.3c-0.4,-1.5 -1.6,-2.4 -3.5,-2.4H42V56z" />
+</vector>
