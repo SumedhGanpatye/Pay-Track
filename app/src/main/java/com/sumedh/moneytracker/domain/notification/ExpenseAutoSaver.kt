@@ -150,7 +150,8 @@ private class PendingExpenseDraftStore(context: Context) {
 object NotificationCategories {
     val quickActions = listOf(
         PaymentPrimaryCategories.FOOD,
-        PaymentPrimaryCategories.SHOPPING,
-        PaymentPrimaryCategories.TRAVEL
+        PaymentPrimaryCategories.TRAVEL,
+        PaymentPrimaryCategories.GROCERY,
+        PaymentPrimaryCategories.SHOPPING
     )
 }

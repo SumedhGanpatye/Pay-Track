@@ -82,19 +82,19 @@ object ExpenseDetectedNotificationHelper {
                 categoryPendingIntent(context, draftId, PaymentPrimaryCategories.FOOD, notificationId)
             )
             .addAction(
-                R.drawable.ic_category_gym,
-                "🛒 Shopping",
-                categoryPendingIntent(context, draftId, PaymentPrimaryCategories.SHOPPING, notificationId)
-            )
-            .addAction(
                 R.drawable.ic_category_coffee,
                 "🚕 Travel",
                 categoryPendingIntent(context, draftId, PaymentPrimaryCategories.TRAVEL, notificationId)
             )
             .addAction(
-                R.drawable.ic_notification,
-                "➕ More",
-                morePendingIntent(context, draftId, parsed, notificationId)
+                R.drawable.ic_category_grocery,
+                "🥬 Grocery",
+                categoryPendingIntent(context, draftId, PaymentPrimaryCategories.GROCERY, notificationId)
+            )
+            .addAction(
+                R.drawable.ic_category_shopping,
+                "🛒 Shopping",
+                categoryPendingIntent(context, draftId, PaymentPrimaryCategories.SHOPPING, notificationId)
             )
 
         try {

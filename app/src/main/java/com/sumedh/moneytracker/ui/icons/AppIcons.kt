@@ -60,6 +60,8 @@ object AppIcons {
     @DrawableRes
     fun categoryDrawable(category: String): Int? = when (category.trim().lowercase()) {
         "food" -> R.drawable.ic_category_food
+        "shopping" -> R.drawable.ic_category_shopping
+        "grocery", "groceries" -> R.drawable.ic_category_grocery
         "coffee", "cafe", "café" -> R.drawable.ic_category_coffee
         "gym", "fitness", "workout" -> R.drawable.ic_category_gym
         "medicine", "medicines", "medical", "health", "pharmacy" ->
@@ -70,6 +72,7 @@ object AppIcons {
     fun categoryFallback(category: String): ImageVector = when (category.trim().lowercase()) {
         "travel" -> Icons.Outlined.Place
         "shopping" -> Icons.Outlined.ShoppingCart
+        "grocery", "groceries" -> Icons.Outlined.ShoppingCart
         "fuel", "petrol", "diesel" -> Icons.Outlined.Warning
         "entertainment", "movies" -> Icons.Outlined.Star
         "bills", "utilities", "rent" -> Icons.Outlined.Home

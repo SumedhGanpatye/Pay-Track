@@ -29,9 +29,11 @@ data class CopyPayUiState(
     val note: String = "",
     val selectedCategory: String = PaymentPrimaryCategories.FOOD,
     val customCategories: List<String> = emptyList(),
+    val showCustomCategoryDialog: Boolean = false,
     val selectedApp: UpiApp = UpiApp.GPAY,
     val awaitingReturn: Boolean = false,
     val showConfirmDialog: Boolean = false,
+    val showSplitOptions: Boolean = false,
     val launchError: String? = null,
     val saved: Boolean = false
 ) {
@@ -88,6 +90,45 @@ class CopyPayViewModel(
         _ui.update { it.copy(selectedCategory = category) }
     }
 
+    fun onOtherCategoryClicked() {
+        _ui.update { it.copy(showCustomCategoryDialog = true) }
+    }
+
+    fun dismissCustomCategoryDialog() {
+        _ui.update { it.copy(showCustomCategoryDialog = false) }
+    }
+
+    fun onCustomCategorySaved(name: String) {
+        val saved = customCategoryStore.add(name) ?: return
+        _ui.update {
+            it.copy(
+                selectedCategory = saved,
+                showCustomCategoryDialog = false,
+                customCategories = customCategoryStore.current()
+            )
+        }
+    }
+
+    fun onCustomCategorySelected(category: String) {
+        _ui.update { it.copy(selectedCategory = category) }
+    }
+
+    fun removeCustomCategory(category: String) {
+        val removed = customCategoryStore.remove(category)
+        if (!removed) return
+        _ui.update { state ->
+            val nextSelected = if (state.selectedCategory.equals(category, ignoreCase = true)) {
+                PaymentPrimaryCategories.FOOD
+            } else {
+                state.selectedCategory
+            }
+            state.copy(
+                selectedCategory = nextSelected,
+                customCategories = customCategoryStore.current()
+            )
+        }
+    }
+
     fun onAppSelected(app: UpiApp) {
         upiPreferences.setDefault(app)
         _ui.update { it.copy(selectedApp = app, launchError = null) }
@@ -102,7 +143,12 @@ class CopyPayViewModel(
         val launched = UpiPaymentLauncher.launchScanOrApp(ctx, state.selectedApp)
         if (launched) {
             _ui.update {
-                it.copy(awaitingReturn = true, showConfirmDialog = false, launchError = null)
+                it.copy(
+                    awaitingReturn = true,
+                    showConfirmDialog = false,
+                    showSplitOptions = false,
+                    launchError = null
+                )
             }
         } else {
             _ui.update {
@@ -119,14 +165,37 @@ class CopyPayViewModel(
     }
 
     fun dismissConfirmDialog() {
-        _ui.update { it.copy(showConfirmDialog = false) }
+        _ui.update { it.copy(showConfirmDialog = false, showSplitOptions = false) }
     }
 
-    fun confirmPaymentSaved(onDone: () -> Unit) {
+    fun onSplitExpenseClicked() {
+        _ui.update { it.copy(showConfirmDialog = false, showSplitOptions = true) }
+    }
+
+    fun dismissSplitOptions() {
+        _ui.update { it.copy(showSplitOptions = false, showConfirmDialog = true) }
+    }
+
+    fun confirmPaymentSaved(onDone: () -> Unit, splitAmong: Int = 1) {
         val state = _ui.value
-        val amount = state.amount ?: return
+        val fullAmount = state.amount ?: return
+        val divisor = splitAmong.coerceAtLeast(1)
+        val amount = ((fullAmount / divisor) * 100.0).toLong() / 100.0
+        if (amount <= 0.0) return
         val note = state.note.trim()
         val category = state.selectedCategory
+        val shareNote = when (divisor) {
+            2 -> "split in 2"
+            3 -> "split in 3"
+            else -> null
+        }
+        val savedNotes = buildString {
+            if (note.isNotBlank()) append(note)
+            if (shareNote != null) {
+                if (isNotEmpty()) append(" · ")
+                append(shareNote)
+            }
+        }
 
         viewModelScope.launch {
             val nowDate = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
@@ -140,14 +209,14 @@ class CopyPayViewModel(
                     date = nowDate,
                     time = nowTime,
                     source = ExpenseSource.MANUAL,
-                    notes = note
+                    notes = savedNotes
                 )
             )
             ExpenseNotificationHelper.showExpenseAdded(
                 context = getApplication(),
                 amount = amount,
                 category = category,
-                note = note.takeIf { it.isNotBlank() }
+                note = note.takeIf { it.isNotBlank() } ?: shareNote
             )
             _ui.update {
                 CopyPayUiState(

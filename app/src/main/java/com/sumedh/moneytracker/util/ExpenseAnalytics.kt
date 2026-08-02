@@ -38,7 +38,8 @@ object ExpenseAnalytics {
     val primaryCategories = listOf(
         PaymentPrimaryCategories.FOOD,
         PaymentPrimaryCategories.TRAVEL,
-        PaymentPrimaryCategories.SHOPPING
+        PaymentPrimaryCategories.SHOPPING,
+        PaymentPrimaryCategories.GROCERY
     )
 
     fun normalizeCategory(label: String): String {
@@ -143,13 +144,15 @@ object ExpenseAnalytics {
     data class ExpenseDayGroup(
         val header: String,
         val isoDate: String,
-        val expenses: List<ExpenseEntity>
+        val expenses: List<ExpenseEntity>,
+        val dayTotal: Double
     )
 
     /** Group expenses (already date-desc) into Today / Yesterday / dated sections. */
     fun groupByDay(
         expenses: List<ExpenseEntity>,
-        today: LocalDate = DateRanges.today()
+        today: LocalDate = DateRanges.today(),
+        dayTotalsByIso: Map<String, Double> = emptyMap()
     ): List<ExpenseDayGroup> {
         if (expenses.isEmpty()) return emptyList()
         val orderedDates = linkedSetOf<String>()
@@ -160,10 +163,12 @@ object ExpenseAnalytics {
             byDate.getOrPut(key) { mutableListOf() }.add(expense)
         }
         return orderedDates.map { iso ->
+            val dayExpenses = byDate[iso].orEmpty()
             ExpenseDayGroup(
                 header = dayHeaderLabel(iso, today),
                 isoDate = iso,
-                expenses = byDate[iso].orEmpty()
+                expenses = dayExpenses,
+                dayTotal = dayTotalsByIso[iso] ?: dayExpenses.sumOf { it.amount }
             )
         }
     }

@@ -75,6 +75,19 @@ class HomeViewModel(
                 initialValue = emptyList()
             )
 
+    /** Full-day spend totals keyed by ISO date (for recent expense day headers). */
+    val daySpendTotals: StateFlow<Map<String, Double>> =
+        repository.observeAllSortedByDateDesc()
+            .map { expenses ->
+                expenses.groupBy { it.date }
+                    .mapValues { (_, dayExpenses) -> dayExpenses.sumOf { it.amount } }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyMap()
+            )
+
     val todaySpent: StateFlow<Double> =
         repository.observeAllSortedByDateDesc()
             .map { expenses ->

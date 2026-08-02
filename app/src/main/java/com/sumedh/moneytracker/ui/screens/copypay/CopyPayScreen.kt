@@ -1,8 +1,9 @@
 package com.sumedh.moneytracker.ui.screens.copypay
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,9 +59,11 @@ import com.sumedh.moneytracker.MoneyTrackerApp
 import com.sumedh.moneytracker.data.ExpenseRepository
 import com.sumedh.moneytracker.domain.expense.PaymentPrimaryCategories
 import com.sumedh.moneytracker.ui.components.AppScreenBackground
+import com.sumedh.moneytracker.ui.components.CustomCategoryDialog
 import com.sumedh.moneytracker.ui.components.GlassCard
 import com.sumedh.moneytracker.ui.components.UpiAppDropdown
 import com.sumedh.moneytracker.ui.theme.Charcoal900
+import com.sumedh.moneytracker.ui.theme.ErrorRed
 import com.sumedh.moneytracker.ui.theme.NeonTeal
 import com.sumedh.moneytracker.ui.theme.SecondaryCard
 import com.sumedh.moneytracker.ui.theme.TextPrimary
@@ -81,6 +87,7 @@ fun CopyPayScreen(
 ) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    var categoryToRemove by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -193,6 +200,12 @@ fun CopyPayScreen(
                 fontWeight = FontWeight.Medium,
                 color = TextSecondary
             )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Long-press a custom category to remove it",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary.copy(alpha = 0.75f)
+            )
             Spacer(modifier = Modifier.height(8.dp))
 
             state.categoryChips.chunked(2).forEachIndexed { index, rowItems ->
@@ -203,6 +216,7 @@ fun CopyPayScreen(
                 ) {
                     rowItems.forEach { category ->
                         val isOther = category == PaymentPrimaryCategories.OTHER
+                        val isCustom = category in state.customCategories
                         val selected = !isOther &&
                             state.selectedCategory.equals(category, ignoreCase = true)
                         CategoryChip(
@@ -210,7 +224,17 @@ fun CopyPayScreen(
                             selected = selected,
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                if (!isOther) viewModel.onCategorySelected(category)
+                                when {
+                                    isOther -> viewModel.onOtherCategoryClicked()
+                                    category in PaymentPrimaryCategories.primaries ->
+                                        viewModel.onCategorySelected(category)
+                                    else -> viewModel.onCustomCategorySelected(category)
+                                }
+                            },
+                            onLongClick = if (isCustom) {
+                                { categoryToRemove = category }
+                            } else {
+                                null
                             }
                         )
                     }
@@ -290,6 +314,41 @@ fun CopyPayScreen(
         }
     }
 
+    if (state.showCustomCategoryDialog) {
+        CustomCategoryDialog(
+            onDismiss = viewModel::dismissCustomCategoryDialog,
+            onSave = viewModel::onCustomCategorySaved
+        )
+    }
+
+    categoryToRemove?.let { category ->
+        AlertDialog(
+            onDismissRequest = { categoryToRemove = null },
+            title = { Text("Remove category?") },
+            text = {
+                Text(
+                    "“$category” will be removed from your custom categories.",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.removeCustomCategory(category)
+                        categoryToRemove = null
+                    }
+                ) {
+                    Text("Remove", color = ErrorRed, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { categoryToRemove = null }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+
     if (state.showConfirmDialog && state.amount != null) {
         val amount = state.amount!!
         val noteLabel = state.note.trim().ifBlank { state.selectedCategory }
@@ -303,31 +362,90 @@ fun CopyPayScreen(
                 )
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.confirmPaymentSaved { onSaved() }
-                    },
-                    modifier = Modifier
-                        .border(1.dp, NeonTeal, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 4.dp)
-                ) {
-                    Text("Yes, add it", color = NeonTeal, fontWeight = FontWeight.SemiBold)
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = viewModel::dismissConfirmDialog) {
+                        Text("Not now", color = TextSecondary)
+                    }
+                    TextButton(onClick = viewModel::onSplitExpenseClicked) {
+                        Text("Split expense", color = NeonTeal, fontWeight = FontWeight.Medium)
+                    }
+                    TextButton(
+                        onClick = {
+                            viewModel.confirmPaymentSaved(onDone = onSaved)
+                        },
+                        modifier = Modifier
+                            .border(1.dp, NeonTeal, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        Text("Yes, add it", color = NeonTeal, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            },
+            dismissButton = {}
+        )
+    }
+
+    if (state.showSplitOptions && state.amount != null) {
+        val amount = state.amount!!
+        val half = ((amount / 2.0) * 100.0).toLong() / 100.0
+        val third = ((amount / 3.0) * 100.0).toLong() / 100.0
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSplitOptions,
+            title = { Text("Split expense") },
+            text = {
+                Text(
+                    "Add only your share of ${ExpenseAnalytics.formatInr(amount)}.",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(
+                        onClick = {
+                            viewModel.confirmPaymentSaved(onDone = onSaved, splitAmong = 2)
+                        },
+                        modifier = Modifier
+                            .border(1.dp, NeonTeal, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        Text(
+                            "Split in 2 · ${ExpenseAnalytics.formatInr(half)}",
+                            color = NeonTeal,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    TextButton(
+                        onClick = {
+                            viewModel.confirmPaymentSaved(onDone = onSaved, splitAmong = 3)
+                        },
+                        modifier = Modifier
+                            .border(1.dp, NeonTeal, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        Text(
+                            "Split in 3 · ${ExpenseAnalytics.formatInr(third)}",
+                            color = NeonTeal,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::dismissConfirmDialog) {
-                    Text("Not now", color = TextSecondary)
+                TextButton(onClick = viewModel::dismissSplitOptions) {
+                    Text("Back", color = TextSecondary)
                 }
             }
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CategoryChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(12.dp)
@@ -345,7 +463,10 @@ private fun CategoryChip(
             .clip(shape)
             .background(background)
             .border(1.dp, borderColor, shape)
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(horizontal = 10.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {

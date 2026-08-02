@@ -56,9 +56,12 @@ fun RecentExpensesSection(
     expenses: List<ExpenseEntity>,
     onViewAll: () -> Unit,
     onExpenseLongPress: (ExpenseEntity) -> Unit,
+    daySpendTotals: Map<String, Double> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
-    val groups = remember(expenses) { ExpenseAnalytics.groupByDay(expenses) }
+    val groups = remember(expenses, daySpendTotals) {
+        ExpenseAnalytics.groupByDay(expenses, dayTotalsByIso = daySpendTotals)
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -104,7 +107,10 @@ fun RecentExpensesSection(
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 groups.forEach { group ->
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DayHeader(title = group.header)
+                        DayHeader(
+                            title = group.header,
+                            dayTotal = group.dayTotal
+                        )
                         group.expenses.forEachIndexed { index, expense ->
                             AnimatedVisibility(
                                 visible = true,
@@ -125,7 +131,10 @@ fun RecentExpensesSection(
 }
 
 @Composable
-private fun DayHeader(title: String) {
+private fun DayHeader(
+    title: String,
+    dayTotal: Double
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -142,7 +151,17 @@ private fun DayHeader(title: String) {
             text = title,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
-            color = TextSecondary
+            color = TextSecondary,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = ExpenseAnalytics.formatInr(dayTotal),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = TextPrimary
         )
     }
 }
@@ -302,7 +321,7 @@ private fun TypeBadge(
 }
 
 @Composable
-private fun EmptyExpensesCard() {
+fun EmptyExpensesCard() {
     val shape = RoundedCornerShape(18.dp)
     Column(
         modifier = Modifier

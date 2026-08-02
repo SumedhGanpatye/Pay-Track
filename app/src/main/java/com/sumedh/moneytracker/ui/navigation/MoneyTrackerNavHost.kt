@@ -54,12 +54,14 @@ import com.sumedh.moneytracker.ui.screens.HomeScreen
 import com.sumedh.moneytracker.ui.screens.SettingsScreen
 import com.sumedh.moneytracker.ui.screens.account.AccountSignupScreen
 import com.sumedh.moneytracker.ui.screens.copypay.CopyPayScreen
+import com.sumedh.moneytracker.ui.screens.history.HistoryScreen
 import com.sumedh.moneytracker.ui.theme.BorderEmerald
 import com.sumedh.moneytracker.ui.theme.CardBackground
 import com.sumedh.moneytracker.ui.theme.NeonTeal
 import com.sumedh.moneytracker.ui.theme.TextSecondary
 
 private const val TRANSITION_MS = 280
+private const val HISTORY_SCROLL_TOP_KEY = "history_scroll_to_top"
 
 private fun sharedAxisXEnter(
     towards: AnimatedContentTransitionScope.SlideDirection
@@ -138,13 +140,15 @@ fun MoneyTrackerNavHost(
                     manualExpensePrefill = manualExpensePrefill,
                     onPrefillConsumed = onPrefillConsumed,
                     onViewAllExpenses = {
-                        navController.navigate(AppDestination.Analysis.route) {
+                        navController.navigate(AppDestination.History.route) {
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
                             }
                             launchSingleTop = true
                             restoreState = true
                         }
+                        navController.getBackStackEntry(AppDestination.History.route)
+                            .savedStateHandle[HISTORY_SCROLL_TOP_KEY] = true
                     },
                     onCopyPay = {
                         navController.navigate(AppDestination.CopyPay.route)
@@ -157,6 +161,18 @@ fun MoneyTrackerNavHost(
                     onBack = { navController.popBackStack() },
                     onSaved = {
                         navController.popBackStack(AppDestination.Home.route, inclusive = false)
+                    }
+                )
+            }
+            composable(AppDestination.History.route) { entry ->
+                val scrollToTop by entry.savedStateHandle
+                    .getStateFlow(HISTORY_SCROLL_TOP_KEY, false)
+                    .collectAsStateWithLifecycle()
+                HistoryScreen(
+                    repository = repository,
+                    scrollToTop = scrollToTop,
+                    onScrollToTopConsumed = {
+                        entry.savedStateHandle[HISTORY_SCROLL_TOP_KEY] = false
                     }
                 )
             }

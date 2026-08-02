@@ -62,6 +62,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val quickAdd by viewModel.quickAdd.collectAsStateWithLifecycle()
     val recentExpenses by viewModel.recentExpenses.collectAsStateWithLifecycle()
+    val daySpendTotals by viewModel.daySpendTotals.collectAsStateWithLifecycle()
     val todaySpent by viewModel.todaySpent.collectAsStateWithLifecycle()
     var selectedExpense by remember { mutableStateOf<ExpenseEntity?>(null) }
     var notificationAccessEnabled by remember {
@@ -143,6 +144,7 @@ fun HomeScreen(
             item(key = "recent") {
                 RecentExpensesSection(
                     expenses = recentExpenses,
+                    daySpendTotals = daySpendTotals,
                     onViewAll = onViewAllExpenses,
                     onExpenseLongPress = { selectedExpense = it }
                 )

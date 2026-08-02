@@ -44,11 +44,12 @@ object CategoryColors {
     val Food = Color(0xFF4ADE9A)          // soft emerald
     val Travel = Color(0xFF8B5CF6)        // violet
     val Shopping = Color(0xFFF0A35E)      // warm orange
+    val Grocery = Color(0xFFF5D76E)       // soft yellow
     val Medical = Color(0xFFE57373)       // soft red
     val Fuel = Color(0xFFE6B84D)          // amber
     val Entertainment = Color(0xFFB794F6) // purple
     val Education = Color(0xFF4DD0E1)     // cyan
-    val Bills = Color(0xFFFFB74D)         // warm amber (utilities)
+    val Bills = Color(0xFFC06B6B)         // soft muted maroon
     val Coffee = Color(0xFFD4A574)        // latte brown
     val Gym = Color(0xFF26C6DA)           // bright cyan (fitness)
     val Gifts = Color(0xFFCE93D8)         // soft orchid
@@ -58,6 +59,7 @@ object CategoryColors {
         "food" -> Food
         "travel" -> Travel
         "shopping" -> Shopping
+        "grocery", "groceries" -> Grocery
         "medical", "medicines", "medicine", "health", "pharmacy" -> Medical
         "coffee", "cafe", "café" -> Coffee
         "gym", "fitness", "workout" -> Gym

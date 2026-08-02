@@ -70,18 +70,19 @@ object PaymentPrimaryCategories {
     const val FOOD = "Food"
     const val TRAVEL = "Travel"
     const val SHOPPING = "Shopping"
+    const val GROCERY = "Grocery"
     const val BILLS = "Bills"
     const val GYM = "Gym"
     const val OTHER = "Other"
 
     /** Built-in chips shown before customs (Other is rendered last). */
-    val primaries = listOf(FOOD, TRAVEL, SHOPPING, BILLS, GYM)
+    val primaries = listOf(FOOD, TRAVEL, SHOPPING, GROCERY, BILLS, GYM)
 
     /** Home screen category summary cards. */
-    val homeSummaryCategories = listOf(FOOD, SHOPPING, TRAVEL, BILLS, GYM, OTHER)
+    val homeSummaryCategories = listOf(FOOD, SHOPPING, GROCERY, TRAVEL, BILLS, GYM, OTHER)
 
     /** All primary labels including Other (for existence checks / analytics). */
-    val labels = listOf(FOOD, TRAVEL, SHOPPING, BILLS, GYM, OTHER)
+    val labels = listOf(FOOD, TRAVEL, SHOPPING, GROCERY, BILLS, GYM, OTHER)
 
     fun idFor(label: String): String = label.trim().lowercase().replace(' ', '_')
 }
