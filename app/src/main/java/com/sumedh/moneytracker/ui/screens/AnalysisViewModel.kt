@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.sumedh.moneytracker.data.ExpenseEntity
 import com.sumedh.moneytracker.data.ExpenseRepository
 import com.sumedh.moneytracker.domain.expense.CustomCategoryStore
+import com.sumedh.moneytracker.domain.expense.PaymentPrimaryCategories
 import com.sumedh.moneytracker.ui.screens.home.CategorySummary
 import com.sumedh.moneytracker.util.DateRanges
 import com.sumedh.moneytracker.util.ExpenseAnalytics
@@ -44,6 +45,10 @@ data class AnalysisUiState(
     val allTimeTotal: Double = 0.0,
     val allTimeTransactionCount: Int = 0,
     val monthOptions: List<MonthOption> = emptyList(),
+    /** Bills kept separate — amount only, not in relative % bars. */
+    val billsTotal: Double = 0.0,
+    /** Period total excluding Bills (basis for category %). */
+    val variableSpendTotal: Double = 0.0,
     val categorySummaries: List<CategorySummary> = emptyList(),
     val topCategory: String? = null,
     val periodLabel: String = "this week",
@@ -98,20 +103,27 @@ class AnalysisViewModel(
         val periodTotal = periodExpenses.sumOf { it.amount }
         val categoryTotals = ExpenseAnalytics.sumByCategory(periodExpenses)
 
+        // Bills are large fixed costs — show amount alone, and measure other
+        // categories as % of spend excluding Bills so day-to-day mix is readable.
+        val billsTotal = categoryTotals.entries
+            .filter { it.key.equals(PaymentPrimaryCategories.BILLS, ignoreCase = true) }
+            .sumOf { it.value }
+        val variableSpendTotal = (periodTotal - billsTotal).coerceAtLeast(0.0)
+
         val categorySummaries = categoryTotals
             .filter { it.value > 0.0 }
+            .filterNot { it.key.equals(PaymentPrimaryCategories.BILLS, ignoreCase = true) }
             .entries
             .sortedByDescending { it.value }
             .map { (label, amount) ->
-                val percent = if (periodTotal > 0.0) {
-                    ((amount / periodTotal) * 100.0).toFloat()
+                val percent = if (variableSpendTotal > 0.0) {
+                    ((amount / variableSpendTotal) * 100.0).toFloat()
                 } else {
                     0f
                 }
                 CategorySummary(
                     label = label,
                     amount = amount,
-                    // Bar width = share of selected period total
                     fraction = (percent / 100f).coerceIn(0f, 1f),
                     percentOfTotal = percent
                 )
@@ -150,6 +162,8 @@ class AnalysisViewModel(
             allTimeTotal = expenses.sumOf { it.amount },
             allTimeTransactionCount = expenses.size,
             monthOptions = monthOptions,
+            billsTotal = billsTotal,
+            variableSpendTotal = variableSpendTotal,
             categorySummaries = categorySummaries,
             topCategory = categorySummaries.firstOrNull()?.label,
             periodLabel = periodLabel,

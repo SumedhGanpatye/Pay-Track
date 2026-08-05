@@ -3,6 +3,9 @@ package com.sumedh.moneytracker.domain.notification
 /**
  * Parser for Google Pay split / payment request notifications.
  *
+ * Requires a request word (request / requested / requests / requesting) so payment
+ * confirmations and other GPay alerts are not treated as expenses.
+ *
  * Primary format:
  *   New split request in 'Amanora Flat'
  *   Pay Manas Jungade Rs 1.00 for 'maggi'
@@ -18,6 +21,12 @@ object NotificationParser {
     private const val AMOUNT = """(?:₹|Rs\.?|INR)\s*([\d,]+(?:\.\d{1,2})?)"""
 
     private val amountRegex = Regex(AMOUNT, RegexOption.IGNORE_CASE)
+
+    /** Mandatory: only treat notifications that are payment/split requests. */
+    private val requestWordRegex = Regex(
+        """\brequest(?:ed|s|ing)?\b""",
+        RegexOption.IGNORE_CASE
+    )
 
     // Straight or curly quotes around the payment note
     private val forNoteRegex = Regex(
@@ -45,13 +54,15 @@ object NotificationParser {
         val text = normalize(raw.combinedText)
         if (text.isBlank()) return null
 
+        // Hard filter: ignore GPay noise that is not a payment/split request.
+        if (!requestWordRegex.containsMatchIn(text)) return null
+
         // Prefer the "Pay … amount … for 'note'" line — ignore the "New split request…" title.
         parsePayLine(text)?.let { return it }
 
-        // Fallbacks for older / alternate GPay wordings
+        // Fallbacks for older / alternate GPay request wordings
         parseRequestedOnGroupBy(text)?.let { return it }
         parseRequestedBy(text)?.let { return it }
-        parseYouPaid(text)?.let { return it }
         parseAmountForNote(text)?.let { return it }
 
         return null
@@ -131,26 +142,6 @@ object NotificationParser {
             title = person.ifBlank { "Payment request" },
             note = extractForNote(text),
             parserUsed = "requested_by",
-            originalText = text
-        )
-    }
-
-    private fun parseYouPaid(text: String): ParsedExpenseData? {
-        val regex = Regex(
-            """you\s+paid\s+$AMOUNT(?:\s+to\s+(.+))?""",
-            RegexOption.IGNORE_CASE
-        )
-        val match = regex.find(text) ?: return null
-        val amount = parseAmount(match.groupValues[1]) ?: return null
-        val person = match.groupValues.getOrNull(2)?.trim()?.trimEnd('.')
-            ?.split(Regex("\\s+"))?.firstOrNull()
-        return ParsedExpenseData(
-            amount = amount,
-            personName = person,
-            groupName = null,
-            title = person?.let { "Paid to $it" } ?: "Payment",
-            note = extractForNote(text),
-            parserUsed = "you_paid",
             originalText = text
         )
     }

@@ -182,7 +182,7 @@ fun AnalysisScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            if (state.categorySummaries.isEmpty()) {
+            if (state.categorySummaries.isEmpty() && state.billsTotal <= 0.0) {
                 Text(
                     text = "Categories",
                     style = MaterialTheme.typography.titleMedium,
@@ -200,7 +200,8 @@ fun AnalysisScreen(
             } else {
                 CategorySummarySection(
                     categories = state.categorySummaries,
-                    periodLabel = state.periodLabel
+                    periodLabel = state.periodLabel,
+                    billsTotal = state.billsTotal
                 )
             }
 
