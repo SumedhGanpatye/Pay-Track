@@ -37,10 +37,16 @@ data class AnalysisUiState(
     val selection: AnalysisSelection = AnalysisSelection.ThisWeek,
     val periodTotal: Double = 0.0,
     val periodTransactionCount: Int = 0,
-    val weeklyTotal: Double = 0.0,
+    /** This week spend excluding Bills (primary). */
+    val weeklyTotalExcludingBills: Double = 0.0,
+    /** This week spend including Bills. */
+    val weeklyTotalWithBills: Double = 0.0,
     val weeklyTransactionCount: Int = 0,
     val weeklyLabel: String = "Mon – this week",
-    val monthlyTotal: Double = 0.0,
+    /** This month spend excluding Bills (primary). */
+    val monthlyTotalExcludingBills: Double = 0.0,
+    /** This month spend including Bills. */
+    val monthlyTotalWithBills: Double = 0.0,
     val monthlyCaption: String = "this month",
     val allTimeTotal: Double = 0.0,
     val allTimeTransactionCount: Int = 0,
@@ -150,14 +156,21 @@ class AnalysisViewModel(
             )
         }
 
+        val weekTotalWithBills = weekItems.sumOf { it.amount }
+        val weekBills = billsAmount(weekItems)
+        val monthTotalWithBills = thisMonthItems.sumOf { it.amount }
+        val monthBills = billsAmount(thisMonthItems)
+
         return AnalysisUiState(
             selection = selected,
             periodTotal = periodTotal,
             periodTransactionCount = periodExpenses.size,
-            weeklyTotal = weekItems.sumOf { it.amount },
+            weeklyTotalExcludingBills = (weekTotalWithBills - weekBills).coerceAtLeast(0.0),
+            weeklyTotalWithBills = weekTotalWithBills,
             weeklyTransactionCount = weekItems.size,
             weeklyLabel = "Mon – this week",
-            monthlyTotal = thisMonthItems.sumOf { it.amount },
+            monthlyTotalExcludingBills = (monthTotalWithBills - monthBills).coerceAtLeast(0.0),
+            monthlyTotalWithBills = monthTotalWithBills,
             monthlyCaption = monthlyCaption,
             allTimeTotal = expenses.sumOf { it.amount },
             allTimeTransactionCount = expenses.size,
@@ -170,6 +183,11 @@ class AnalysisViewModel(
             trackingSinceLabel = trackingSince?.let { "Tracking since $it" }
         )
     }
+
+    private fun billsAmount(expenses: List<ExpenseEntity>): Double =
+        expenses
+            .filter { it.category.equals(PaymentPrimaryCategories.BILLS, ignoreCase = true) }
+            .sumOf { it.amount }
 
     /**
      * Previous month first, then going back through 12 months

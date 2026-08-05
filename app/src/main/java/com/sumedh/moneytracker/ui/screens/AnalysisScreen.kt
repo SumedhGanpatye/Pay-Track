@@ -52,6 +52,7 @@ import com.sumedh.moneytracker.ui.screens.home.CategorySummarySection
 import com.sumedh.moneytracker.ui.theme.CardBackground
 import com.sumedh.moneytracker.ui.theme.NeonTeal
 import com.sumedh.moneytracker.ui.theme.SecondaryCard
+import com.sumedh.moneytracker.ui.theme.SoftMint
 import com.sumedh.moneytracker.ui.theme.TextPrimary
 import com.sumedh.moneytracker.ui.theme.TextSecondary
 import com.sumedh.moneytracker.util.ExpenseAnalytics
@@ -126,10 +127,17 @@ fun AnalysisScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = ExpenseAnalytics.formatInr(state.weeklyTotal),
+                            text = ExpenseAnalytics.formatInr(state.weeklyTotalExcludingBills),
                             style = MaterialTheme.typography.displayLarge,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${ExpenseAnalytics.formatInr(state.weeklyTotalWithBills)} with Bills",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = SoftMint
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
@@ -156,7 +164,8 @@ fun AnalysisScreen(
                     modifier = Modifier.weight(1f),
                     icon = AppIcons.DateRange,
                     title = "Monthly spend",
-                    amount = state.monthlyTotal,
+                    amount = state.monthlyTotalExcludingBills,
+                    amountWithBills = state.monthlyTotalWithBills,
                     caption = state.monthlyCaption,
                     selected = isThisMonthSelected,
                     onClick = viewModel::selectThisMonth
@@ -324,7 +333,8 @@ private fun StatTile(
     caption: String,
     selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    amountWithBills: Double? = null
 ) {
     val shape = RoundedCornerShape(18.dp)
     val borderColor = if (selected) NeonTeal else Color.White.copy(alpha = 0.07f)
@@ -367,6 +377,15 @@ private fun StatTile(
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
             )
+            if (amountWithBills != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${ExpenseAnalytics.formatInr(amountWithBills)} with Bills",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = SoftMint
+                )
+            }
             Text(text = caption, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         }
     }
