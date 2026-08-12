@@ -18,10 +18,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
         )
 
         val app = context.applicationContext as MoneyTrackerApp
-        app.expenseAutoSaver.saveFromDraft(draftId, category)
-
-        if (notificationId != -1) {
-            ExpenseDetectedNotificationHelper.dismiss(context, notificationId)
-        }
+        app.expenseAutoSaver.saveFromDraft(
+            draftId = draftId,
+            category = category,
+            notificationId = notificationId
+        )
     }
 }

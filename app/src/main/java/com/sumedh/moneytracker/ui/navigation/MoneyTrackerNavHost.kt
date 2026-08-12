@@ -49,6 +49,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sumedh.moneytracker.MoneyTrackerApp
 import com.sumedh.moneytracker.data.ExpenseRepository
+import com.sumedh.moneytracker.ui.components.ExpenseAddedBannerHost
 import com.sumedh.moneytracker.ui.screens.AnalysisScreen
 import com.sumedh.moneytracker.ui.screens.HomeScreen
 import com.sumedh.moneytracker.ui.screens.SettingsScreen
@@ -199,6 +200,8 @@ fun MoneyTrackerNavHost(
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
+
+        ExpenseAddedBannerHost(modifier = Modifier.align(Alignment.TopCenter))
     }
 }
 

@@ -1,7 +1,10 @@
 package com.sumedh.moneytracker.service
 
 import android.app.Notification
+import android.content.ComponentName
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.sumedh.moneytracker.MoneyTrackerApp
@@ -10,7 +13,36 @@ import com.sumedh.moneytracker.domain.notification.RawNotificationData
 
 class GPayNotificationListenerService : NotificationListenerService() {
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        // Catch splits that arrived while the listener was unbound (common after
+        // app updates / OEM process kills). Dedup in NotificationRepository.
+        try {
+            activeNotifications
+                ?.filter { it.packageName == GPayNotificationConstants.PACKAGE }
+                ?.forEach { handlePosted(it) }
+        } catch (_: SecurityException) {
+            // Listener can briefly be unbound during reconnect races.
+        }
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        // Ask the system to bind us again — Samsung often drops NLS bindings.
+        mainHandler.postDelayed({
+            requestRebind(
+                ComponentName(this, GPayNotificationListenerService::class.java)
+            )
+        }, 1_500L)
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        handlePosted(sbn)
+    }
+
+    private fun handlePosted(sbn: StatusBarNotification) {
         if (sbn.packageName != GPayNotificationConstants.PACKAGE) return
 
         val extras = sbn.notification.extras ?: return

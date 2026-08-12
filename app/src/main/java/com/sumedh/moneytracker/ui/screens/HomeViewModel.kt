@@ -11,6 +11,7 @@ import com.sumedh.moneytracker.data.ExpenseSource
 import com.sumedh.moneytracker.data.ExpenseType
 import com.sumedh.moneytracker.domain.expense.CustomCategoryStore
 import com.sumedh.moneytracker.domain.expense.PaymentPrimaryCategories
+import com.sumedh.moneytracker.ui.feedback.ExpenseAddedFeedback
 import com.sumedh.moneytracker.service.ExpenseNotificationHelper
 import com.sumedh.moneytracker.ui.navigation.ManualExpensePrefill
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -235,11 +236,12 @@ class HomeViewModel(
                         notes = notes
                     )
                 )
-                ExpenseNotificationHelper.showExpenseAdded(
-                    context = getApplication(),
-                    amount = amount,
-                    category = category,
-                    note = notes.takeIf { it.isNotBlank() }
+                ExpenseAddedFeedback.show(
+                    ExpenseNotificationHelper.buildExpenseAddedMessage(
+                        amount = amount,
+                        category = category,
+                        note = notes.takeIf { it.isNotBlank() }
+                    )
                 )
             }
             cancelEdit()

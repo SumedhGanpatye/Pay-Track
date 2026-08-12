@@ -21,10 +21,13 @@ class NotificationRepository(
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val seenKeys = Collections.synchronizedSet(mutableSetOf<String>())
+    private val handledPrefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun onNotificationReceived(raw: RawNotificationData) {
         val dedupeKey = "${raw.notificationKey}:${raw.timestamp}"
         if (!seenKeys.add(dedupeKey)) return
+        // Survives process death / listener rebind so active-shade rescans don't re-notify.
+        if (handledPrefs.contains(dedupeKey)) return
 
         scope.launch {
             val parsed = NotificationParser.parse(raw)
@@ -43,6 +46,7 @@ class NotificationRepository(
             )
 
             parsed?.let { data ->
+                markHandled(dedupeKey)
                 val draftId = expenseAutoSaver.storeDraft(data)
                 ExpenseDetectedNotificationHelper.show(
                     context = appContext,
@@ -54,4 +58,27 @@ class NotificationRepository(
     }
 
     fun testParse(text: String): ParsedExpenseData? = NotificationParser.parseText(text)
+
+    private fun markHandled(dedupeKey: String) {
+        handledPrefs.edit().putLong(dedupeKey, System.currentTimeMillis()).apply()
+        pruneHandledPrefs()
+    }
+
+    private fun pruneHandledPrefs() {
+        val cutoff = System.currentTimeMillis() - HANDLED_TTL_MS
+        val stale = handledPrefs.all.entries
+            .mapNotNull { (key, value) ->
+                val ts = value as? Long ?: return@mapNotNull key
+                key.takeIf { ts < cutoff }
+            }
+        if (stale.isEmpty()) return
+        handledPrefs.edit().apply {
+            stale.forEach { remove(it) }
+        }.apply()
+    }
+
+    companion object {
+        private const val PREFS_NAME = "gpay_notif_handled"
+        private const val HANDLED_TTL_MS = 7L * 24 * 60 * 60 * 1000
+    }
 }

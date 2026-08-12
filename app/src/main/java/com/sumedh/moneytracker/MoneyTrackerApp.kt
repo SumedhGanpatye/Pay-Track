@@ -6,6 +6,7 @@ import com.sumedh.moneytracker.data.ExpenseRepository
 import com.sumedh.moneytracker.data.NotificationDebugRepository
 import com.sumedh.moneytracker.domain.expense.CustomCategoryStore
 import com.sumedh.moneytracker.domain.notification.ExpenseAutoSaver
+import com.sumedh.moneytracker.domain.notification.NotificationPermissionManager
 import com.sumedh.moneytracker.domain.notification.NotificationRepository
 import com.sumedh.moneytracker.domain.upi.UpiPreferences
 import com.sumedh.moneytracker.domain.profile.ThemePreferences
@@ -51,5 +52,6 @@ class MoneyTrackerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         ExpenseDetectedNotificationHelper.ensureChannel(this)
+        NotificationPermissionManager.ensureListenerBound(this)
     }
 }

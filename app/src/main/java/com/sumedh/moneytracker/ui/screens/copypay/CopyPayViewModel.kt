@@ -15,6 +15,7 @@ import com.sumedh.moneytracker.domain.upi.UpiApp
 import com.sumedh.moneytracker.domain.upi.UpiPaymentLauncher
 import com.sumedh.moneytracker.domain.upi.UpiPreferences
 import com.sumedh.moneytracker.service.ExpenseNotificationHelper
+import com.sumedh.moneytracker.ui.feedback.ExpenseAddedFeedback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -212,11 +213,12 @@ class CopyPayViewModel(
                     notes = savedNotes
                 )
             )
-            ExpenseNotificationHelper.showExpenseAdded(
-                context = getApplication(),
-                amount = amount,
-                category = category,
-                note = note.takeIf { it.isNotBlank() } ?: shareNote
+            ExpenseAddedFeedback.show(
+                ExpenseNotificationHelper.buildExpenseAddedMessage(
+                    amount = amount,
+                    category = category,
+                    note = note.takeIf { it.isNotBlank() } ?: shareNote
+                )
             )
             _ui.update {
                 CopyPayUiState(

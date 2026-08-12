@@ -120,24 +120,17 @@ fun AnalysisScreen(
                 ) {
                     Column {
                         Text(
-                            text = state.weeklyLabel.uppercase(),
+                            text = "WEEKLY SPEND",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = NeonTeal
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = ExpenseAnalytics.formatInr(state.weeklyTotalExcludingBills),
+                            text = ExpenseAnalytics.formatInr(state.weeklyTotalWithBills),
                             style = MaterialTheme.typography.displayLarge,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "${ExpenseAnalytics.formatInr(state.weeklyTotalWithBills)} with Bills",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = SoftMint
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
@@ -229,8 +222,8 @@ private fun MonthCompareDropdown(
     var expanded by remember { mutableStateOf(false) }
     val selectedOption = options.firstOrNull { it.yearMonth == selectedMonth }
     val isSelected = selectedOption != null
-    val shape = RoundedCornerShape(16.dp)
-    val borderColor = if (isSelected) NeonTeal else Color.White.copy(alpha = 0.08f)
+    val shape = RoundedCornerShape(20.dp)
+    val borderColor = if (isSelected) NeonTeal.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.08f)
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -248,36 +241,63 @@ private fun MonthCompareDropdown(
                     .fillMaxWidth()
                     .clip(shape)
                     .border(1.dp, borderColor, shape),
-                color = if (isSelected) NeonTeal.copy(alpha = 0.14f) else SecondaryCard,
+                color = Color.Transparent,
                 shape = shape
             ) {
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    if (isSelected) NeonTeal.copy(alpha = 0.18f) else SecondaryCard,
+                                    CardBackground
+                                )
+                            )
+                        )
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = selectedOption?.label ?: "Choose a month",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = selectedOption?.let {
-                                "Total ${ExpenseAnalytics.formatInr(it.total)}"
-                            } ?: "Previous 12 months",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = selectedOption?.label ?: "Choose a month",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            if (selectedOption != null) {
+                                Text(
+                                    text = ExpenseAnalytics.formatInr(selectedOption.total),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SoftMint
+                                )
+                            } else {
+                                Text(
+                                    text = "Previous 12 months",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(NeonTeal.copy(alpha = 0.14f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = SoftMint
+                            )
+                        }
                     }
-                    Icon(
-                        imageVector = Icons.Outlined.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = if (isSelected) NeonTeal else TextSecondary
-                    )
                 }
             }
 
@@ -285,15 +305,30 @@ private fun MonthCompareDropdown(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .background(CardBackground)
+                    .fillMaxWidth(0.92f)
+                    .background(
+                        Brush.verticalGradient(listOf(SecondaryCard, CardBackground)),
+                        RoundedCornerShape(16.dp)
+                    )
+                    .border(1.dp, NeonTeal.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
             ) {
                 options.forEach { option ->
                     val selected = option.yearMonth == selectedMonth
                     DropdownMenuItem(
                         text = {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .then(
+                                        if (selected) {
+                                            Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(NeonTeal.copy(alpha = 0.12f))
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        } else {
+                                            Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        }
+                                    ),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -301,16 +336,16 @@ private fun MonthCompareDropdown(
                                     text = option.label,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selected) NeonTeal else TextPrimary,
+                                    color = if (selected) SoftMint else TextPrimary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
                                     text = ExpenseAnalytics.formatInr(option.total),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (selected) NeonTeal else TextSecondary
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SoftMint
                                 )
                             }
                         },

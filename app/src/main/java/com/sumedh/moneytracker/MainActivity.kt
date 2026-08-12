@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.sumedh.moneytracker.service.ExpenseDetectedNotificationHelper
 import com.sumedh.moneytracker.service.ExpenseNotificationHelper
+import com.sumedh.moneytracker.domain.notification.NotificationPermissionManager
 import com.sumedh.moneytracker.ui.navigation.MoneyTrackerNavHost
 import com.sumedh.moneytracker.ui.navigation.ManualExpensePrefill
 import com.sumedh.moneytracker.ui.theme.MoneyTrackerTheme
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
         ExpenseNotificationHelper.ensureChannel(this)
         ExpenseDetectedNotificationHelper.ensureChannel(this)
         maybeRequestNotificationPermission()
+        NotificationPermissionManager.ensureListenerBound(this)
         handlePrefillIntent(intent)
 
         val app = application as MoneyTrackerApp
@@ -59,6 +61,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        NotificationPermissionManager.ensureListenerBound(this)
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import android.text.TextUtils
 import com.sumedh.moneytracker.service.GPayNotificationListenerService
 
@@ -28,6 +29,21 @@ object NotificationPermissionManager {
                 }
             }
             false
+        }
+    }
+
+    /**
+     * Re-request the system bind when access is enabled but the listener process
+     * was killed (common after installs / OEM battery managers). Safe to call often.
+     */
+    fun ensureListenerBound(context: Context) {
+        if (!isNotificationListenerEnabled(context)) return
+        val component = ComponentName(
+            context,
+            GPayNotificationListenerService::class.java
+        )
+        runCatching {
+            NotificationListenerService.requestRebind(component)
         }
     }
 

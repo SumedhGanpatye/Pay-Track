@@ -104,6 +104,31 @@ object ExpenseDetectedNotificationHelper {
         }
     }
 
+    /**
+     * Replaces the existing Expense Detected notification (same id) with a short
+     * "expense was added" confirmation — no second notification is posted.
+     */
+    fun updateToExpenseAdded(context: Context, notificationId: Int, message: String) {
+        if (notificationId == -1) return
+        ensureChannel(context)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Expense added")
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .clearActions()
+
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, builder.build())
+        } catch (_: SecurityException) {
+            // POST_NOTIFICATIONS may be denied
+        }
+    }
+
     fun dismiss(context: Context, notificationId: Int) {
         NotificationManagerCompat.from(context).cancel(notificationId)
     }

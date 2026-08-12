@@ -8,6 +8,7 @@ import com.sumedh.moneytracker.data.ExpenseRepository
 import com.sumedh.moneytracker.data.ExpenseSource
 import com.sumedh.moneytracker.data.ExpenseType
 import com.sumedh.moneytracker.domain.expense.PaymentPrimaryCategories
+import com.sumedh.moneytracker.service.ExpenseDetectedNotificationHelper
 import com.sumedh.moneytracker.service.ExpenseNotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,7 @@ class ExpenseAutoSaver(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val draftStore = PendingExpenseDraftStore(context)
+    private val appContext = context.applicationContext
 
     fun storeDraft(parsed: ParsedExpenseData): String {
         val draftId = UUID.randomUUID().toString()
@@ -43,49 +45,36 @@ class ExpenseAutoSaver(
         return draftId
     }
 
-    fun saveFromDraft(draftId: String, category: String) {
+    fun saveFromDraft(draftId: String, category: String, notificationId: Int = -1) {
         val draft = draftStore.consume(draftId) ?: return
-        saveExpense(
-            amount = draft.amount,
-            title = draft.title,
-            category = category,
-            personName = draft.personName,
-            groupName = draft.groupName,
-            notes = draft.notes
-        )
-    }
-
-    fun saveExpense(
-        amount: Double,
-        title: String,
-        category: String,
-        personName: String?,
-        groupName: String?,
-        notes: String = ""
-    ) {
         scope.launch {
             val nowDate = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
             val nowTime = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
             expenseRepository.insert(
                 ExpenseEntity(
-                    amount = amount,
-                    title = notes.takeIf { it.isNotBlank() } ?: title,
+                    amount = draft.amount,
+                    title = draft.notes.takeIf { it.isNotBlank() } ?: draft.title,
                     category = category,
                     expenseType = ExpenseType.SPLIT,
-                    personName = personName,
-                    groupName = groupName,
+                    personName = draft.personName,
+                    groupName = draft.groupName,
                     date = nowDate,
                     time = nowTime,
                     source = ExpenseSource.NOTIFICATION,
-                    notes = notes
+                    notes = draft.notes
                 )
             )
-            ExpenseNotificationHelper.showExpenseAdded(
-                context = context.applicationContext,
-                amount = amount,
+            val message = ExpenseNotificationHelper.buildExpenseAddedMessage(
+                amount = draft.amount,
                 category = category,
-                note = notes.takeIf { it.isNotBlank() },
-                requestor = personName
+                note = draft.notes.takeIf { it.isNotBlank() },
+                requestor = draft.personName
+            )
+            // Update the same Expense Detected notification — do not post a new one.
+            ExpenseDetectedNotificationHelper.updateToExpenseAdded(
+                context = appContext,
+                notificationId = notificationId,
+                message = message
             )
         }
     }
